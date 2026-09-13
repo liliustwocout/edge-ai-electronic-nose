@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WISE-IoTSuite Dashboard | TaskForce141 E-Nose Safety</title>
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Custom CSS Styles -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Top Navigation Bar chuẩn Advantech WISE-IoTSuite Dashboard -->
+  <header class="wise-topbar">
+    <div class="wise-nav-left">
+      <button class="wise-menu-btn">&#9776;</button>
+      <div class="wise-logo-title">WISE-IoTSuite <span>Dashboard</span></div>
+      <div class="wise-breadcrumbs">
+        <span>&#9638; TemplateDashboard</span>
+        <span>&rsaquo;</span>
+        <span class="crumb-active">E-Nose Gas Safety Gateway &bull; TaskForce141</span>
+      </div>
+    </div>
+
+    <div class="wise-nav-right">
+      <div class="wise-time-range" id="wiseClock">
+        2026-09-12 23:25:00 UTC
+      </div>
+      <div class="wise-powered-by">
+        <span>POWERED BY</span>
+        <strong>WISE-PaaS</strong>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main WISE-IoT Container -->
+  <main class="wise-container">
+
+    <!-- Emergency Notification Alert Banner -->
+    <div id="wiseAlertBanner" class="wise-alert-banner">
+      <div style="font-size: 12px; color: #fecaca; font-weight: 600;">
+        CRITICAL ALARM: <span id="alertGasName">H2S</span> LEAKAGE DETECTED (<span id="alertPpm">50</span> ppm)! Compressor Station Area 1.
+      </div>
+      <button id="btnAcknowledge" class="btn-action" style="background: #ef4444; border-color: #ef4444; color: white;">
+        Acknowledge Alarm
+      </button>
+    </div>
+
+    <!-- Control Toolbar (Gas Selector & Playback) -->
+    <section class="wise-toolbar">
+      <div class="gas-tabs">
+        <span class="tab-label">Target Gas:</span>
+        <button class="gas-tab active" data-gas="H2S">H₂S</button>
+        <button class="gas-tab" data-gas="CO">CO</button>
+        <button class="gas-tab" data-gas="NH3">NH₃</button>
+        <button class="gas-tab" data-gas="SO2">SO₂</button>
+        <button class="gas-tab" data-gas="NO2">NO₂</button>
+        <button class="gas-tab" data-gas="CH3OCH3">CH₃OCH₃</button>
+        <button class="gas-tab" data-gas="C2H5OH">C₂H₅OH</button>
+        <button class="gas-tab" data-gas="H2">H₂</button>
+      </div>
+
+      <div class="stream-actions">
+        <button id="btnPlayPause" class="btn-action">PAUSE</button>
+        <button id="speed1x" class="btn-action active">1x</button>
+        <button id="speed2x" class="btn-action">2.5x</button>
+      </div>
+    </section>
+
+    <!-- Hàng 1: 6 Thẻ KPI Top Row rực rỡ chuẩn WISE-PaaS -->
+    <section class="kpi-row-wise">
+      <!-- Card 1 (Green) -->
+      <div class="wise-kpi-card green">
+        <div class="kpi-top-title">ESTIMATED CONCENTRATION</div>
+        <div class="kpi-main-val" id="kpiPpmVal">2.45 ppm</div>
+        <div class="kpi-sub-desc">Active Analyte: <span id="currentGasTitle">H2S</span></div>
+      </div>
+
+      <!-- Card 2 (Orange) -->
+      <div class="wise-kpi-card orange">
+        <div class="kpi-top-title">PEAK SENSOR CHANNEL</div>
+        <div class="kpi-main-val" id="kpiPeakSensorVal">S2 (Peak)</div>
+        <div class="kpi-sub-desc">Highest Response in Array</div>
+      </div>
+
+      <!-- Card 3 (Purple) -->
+      <div class="wise-kpi-card purple">
+        <div class="kpi-top-title">STREAM FRAME SAMPLE</div>
+        <div class="kpi-main-val" id="kpiTotalSampleVal">1 / 60</div>
+        <div class="kpi-sub-desc">Continuous Modbus Poll</div>
+      </div>
+
+      <!-- Card 4 (Blue) -->
+      <div class="wise-kpi-card blue">
+        <div class="kpi-top-title">MEASUREMENT RANGE</div>
+        <div class="kpi-main-val" id="kpiRangeVal">0 - 10 ppm</div>
+        <div class="kpi-sub-desc">Calibrated Sensor Scale</div>
+      </div>
+
+      <!-- Card 5 (Red) -->
+      <div class="wise-kpi-card red">
+        <div class="kpi-top-title">SAFETY STATUS</div>
+        <div class="kpi-main-val" id="kpiRiskVal">NORMAL</div>
+        <div class="kpi-sub-desc">Threshold Check PEL</div>
+      </div>
+
+      <!-- Card 6 (Teal) -->
+      <div class="wise-kpi-card teal">
+        <div class="kpi-top-title">MT-DL MODEL MAPE</div>
+        <div class="kpi-main-val" id="kpiMapeVal">6.64%</div>
+        <div class="kpi-sub-desc">Accuracy: 100% (Classification)</div>
+      </div>
+    </section>
+
+    <!-- Hàng 2: Grid 4 Cột Biểu Đồ Chuẩn WISE-PaaS -->
+    <section class="grid-row-4">
+      <!-- Chart 1: Real-time activity (Bar chart) -->
+      <div class="wise-panel">
+        <div class="wise-panel-header">
+          <h3>Real-time activity</h3>
+          <span class="panel-tag">HISTOGRAM</span>
+        </div>
+        <div class="wise-panel-body">
+          <div class="chart-wrapper">
+            <canvas id="barActivityChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart 2: Page view of platform application / Multi-sensor trend -->
+      <div class="wise-panel">
+        <div class="wise-panel-header">
+          <h3>Page view of platform application</h3>
+          <span class="panel-tag">MULTI-CHANNEL</span>
+        </div>
+        <div class="wise-panel-body">
+          <div class="chart-wrapper">
+            <canvas id="lineTrendChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart 3: Upload and download network performance monitoring (Area chart) -->
+      <div class="wise-panel">
+        <div class="wise-panel-header">
+          <h3>Upload and download network performance monitoring</h3>
+          <span class="panel-tag">FLOW &amp; RATIO</span>
+        </div>
+        <div class="wise-panel-body">
+          <div class="chart-wrapper">
+            <canvas id="areaNetworkChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart 4: Using browser statistics / Sensor Array Distribution (Donut chart) -->
+      <div class="wise-panel">
+        <div class="wise-panel-header">
+          <h3>Using browser statistics</h3>
+          <span class="panel-tag">ARRAY RATIO</span>
+        </div>
+        <div class="wise-panel-body">
+          <div class="chart-wrapper">
+            <canvas id="donutArrayChart"></canvas>
+            <div class="donut-center-stat">
+              <div class="big-num">8</div>
+              <div class="small-lbl">Channels</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Hàng 3: Grid Bottom (Server Status, Server Load, System transaction list, Order processing time rate) -->
+    <section class="grid-row-bottom">
+      <!-- Panel 1: Server Status (Progress Bars) -->
+      <div class="wise-panel">
+        <div class="wise-panel-header">
+          <h3>Server Status</h3>
+          <span class="panel-tag">HARDWARE</span>
+        </div>
+        <div class="wise-panel-body">
+          <div class="progress-list">
+            <div class="progress-item">
+              <div class="progress-labels">
+                <span>CPU Usage (RPi 5 4-Cores)</span>
+                <strong id="barCpuTxt">40.0%</strong>
+              </div>
+              <div class="progress-track"><div id="barCpuFill" class="progress-fill" style="width: 40%;"></div></div>
+            </div>
+
+            <div class="progress-item">
+              <div class="progress-labels">
+                <span>Memory Usage (35%)</span>
+                <strong>35.0%</strong>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width: 35%;"></div></div>
+            </div>
+
+            <div class="progress-item">
+              <div class="progress-labels">
+                <span>Disk Storage (NVMe/SD)</span>
+                <strong>82.2%</strong>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width: 82.2%;"></div></div>
+            </div>
+
+            <div class="progress-item">
+              <div class="progress-labels">
+                <span>RS-485 Modbus Bus Load</span>
+                <strong id="barBusTxt">63.0%</strong>
+              </div>
+              <div class="progress-track"><div id="barBusFill" class="progress-fill" style="width: 63%;"></div></div>
+            </div>
+
+            <div class="progress-item">
+              <div class="progress-labels">
+                <span>MQTT Broker Buffer</span>
+                <strong>13.0%</strong>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width: 13%;"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel 2: Server Load (Line Chart) -->
+      <div class="wise-panel">
+        <div class="wise-panel-header">
+          <h3>Server Load</h3>
+          <span class="panel-tag">EDGE COMPUTE</span>
+        </div>
+        <div class="wise-panel-body">
+          <div class="chart-wrapper" style="height: 190px;">
+            <canvas id="serverLoadChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel 3: System transaction list (Bảng nhật ký) -->
+      <div class="wise-panel">
+        <div class="wise-panel-header">
+          <h3>System transaction list</h3>
+          <span class="panel-tag">EVENT LOG</span>
+        </div>
+        <div class="wise-panel-body" style="padding: 0;">
+          <div class="wise-table-scroll">
+            <table class="wise-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Node / Target</th>
+                  <th>Action</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="wiseTxTableBody">
+                <tr>
+                  <td>2026-09-12 23:20:00</td>
+                  <td>Node 1 (Compressor)</td>
+                  <td>Telemetry Ingestion</td>
+                  <td><span class="status-tag normal">NORMAL</span></td>
+                </tr>
+                <tr>
+                  <td>2026-09-12 23:19:58</td>
+                  <td>RPi 5 Gateway</td>
+                  <td>Edge AI Inference</td>
+                  <td><span class="status-tag normal">NORMAL</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Panel 4: System order processing time rate (Gauge Chart bán nguyệt) -->
+      <div class="wise-panel">
+        <div class="wise-panel-header">
+          <h3>System order processing time rate</h3>
+          <span class="panel-tag">CONFIDENCE</span>
+        </div>
+        <div class="wise-panel-body">
+          <div class="gauge-box">
+            <div class="gauge-canvas-wrapper">
+              <canvas id="gaugeProcessChart"></canvas>
+              <div class="gauge-val-display">
+                <div class="gauge-number" id="gaugeDisplayNumber">91</div>
+                <div class="gauge-sub">AI Score</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Khởi tạo đồ thị Server Load (Hàng dưới, Panel 2)
+    document.addEventListener('DOMContentLoaded', () => {
+      const ctx = document.getElementById('serverLoadChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['1', '2', '3', '4', '5', '6', '7'],
+          datasets: [{
+            label: 'Edge AI Latency',
+            data: [52, 60, 72, 90, 78, 64, 55],
+            borderColor: '#38bdf8',
+            backgroundColor: 'transparent',
+            tension: 0.35,
+            borderWidth: 2,
+            pointRadius: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: '#132238' }, ticks: { color: '#64748b', font: { size: 9 } } },
+            y: { grid: { color: '#132238' }, ticks: { color: '#64748b', font: { size: 9 } }, min: 40, max: 100 }
+          }
+        }
+      });
+    });
+  </script>
+
+  <!-- Custom App Scripts -->
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
