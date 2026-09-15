@@ -127,6 +127,8 @@ Publish Telemetry & Event Qua MQTT Lên WISE-IoT Cloud → Display Trên Web Das
 ```bash
 pip install -r backend/requirements.txt
 python -m backend.train
-python -m backend.gateway
 python -m backend.app
+
+python -m http.server 8000
+http://127.0.0.1:8000/dashboard/index.html
 ```
