@@ -6,274 +6,419 @@ import asyncio
 import uvicorn
 import numpy as np
 import pandas as pd
-import tensorflow as tf
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
+from backend.train import extract_window_features, extract_pulse_features, parse_pulse_num
+
 classesPath = 'backend/classes.json'
-modelPath = 'backend/model.keras'
-scalerPath = 'backend/scaler.pkl'
-if not (os.path.exists(classesPath) and os.path.exists(scalerPath) and os.path.exists(modelPath)):
-  from backend.train import trainModel
-  trainModel()
-app = FastAPI()
+modelGasPath = 'backend/model_gas.pkl'
+modelPpmPath = 'backend/model_ppm.pkl'
+modelPulseGasPath = 'backend/model_pulse_gas.pkl'
+modelPulsePpmPath = 'backend/model_pulse_ppm.pkl'
+
+if not (os.path.exists(classesPath) and os.path.exists(modelGasPath) and os.path.exists(modelPpmPath)):
+    from backend.train import trainModel
+    trainModel()
+
+app = FastAPI(title="Electronic Nose Edge AI Gateway")
 app.add_middleware(
-  CORSMiddleware,
-  allow_origins=['*'],
-  allow_credentials=True,
-  allow_methods=['*'],
-  allow_headers=['*']
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*']
 )
+
 app.mount('/dashboard', StaticFiles(directory='dashboard', html=True), name='dashboard')
+
 @app.get('/')
 def getRoot():
-  return RedirectResponse(url='/dashboard/index.html')
+    return RedirectResponse(url='/dashboard/index.html')
+
 with open(classesPath, 'r', encoding='utf-8') as f:
-  meta = json.load(f)
+    meta = json.load(f)
+
 classes = meta['classes']
-model = tf.keras.models.load_model(modelPath)
+
+with open(modelGasPath, 'rb') as f:
+    clf_win = pickle.load(f)
+with open(modelPpmPath, 'rb') as f:
+    reg_win = pickle.load(f)
+with open(modelPulseGasPath, 'rb') as f:
+    clf_pulse = pickle.load(f)
+with open(modelPulsePpmPath, 'rb') as f:
+    reg_pulse = pickle.load(f)
+
+
 def buildScenarios():
-  h2sDf = pd.read_csv('data/H2S.csv')
-  coDf = pd.read_csv('data/CO.csv')
-  h2sRaw = h2sDf['S3'].values
-  coRaw = coDf['S3'].values
-  h2sSlice = h2sRaw[1400:1520].tolist()
-  coSlice = coRaw[1420:1510].tolist()
-  np.random.seed(42)
-  airSlice = [round(float(1.000 + np.random.normal(0, 0.0012)), 4) for _ in range(40)]
-  fieldPoints = []
-  for idx, v in enumerate(airSlice[:15]):
-    noise = float(np.random.normal(0, 0.002))
-    rawVal = round(float(v + noise), 4)
-    temp = round(28.5 + 0.1 * np.sin(idx * 0.2), 1)
-    hum = round(64.0 + 0.3 * np.cos(idx * 0.1), 1)
-    fieldPoints.append({'s3': round(float(v), 4), 's3Raw': rawVal, 'temperature': temp, 'humidity': hum, 'trueGas': 'Air', 'ppm': 0.0, 'phase': 'Baseline'})
-  for idx, v in enumerate(coSlice[:40]):
-    noise = float(np.random.normal(0, 0.003))
-    rawVal = round(float(v + noise), 4)
-    ppmVal = round(float(max(0.0, (v - 1.0) * 820.0)), 1)
-    temp = round(29.0 + 0.2 * np.sin(idx * 0.3), 1)
-    hum = round(63.5 - 0.1 * idx, 1)
-    fieldPoints.append({'s3': round(float(v), 4), 's3Raw': rawVal, 'temperature': temp, 'humidity': hum, 'trueGas': 'CO', 'ppm': ppmVal, 'phase': 'COPuff'})
-  for idx, v in enumerate(airSlice[:15]):
-    noise = float(np.random.normal(0, 0.002))
-    rawVal = round(float(v + noise), 4)
-    temp = round(28.7 + 0.05 * idx, 1)
-    hum = round(64.2, 1)
-    fieldPoints.append({'s3': round(float(v), 4), 's3Raw': rawVal, 'temperature': temp, 'humidity': hum, 'trueGas': 'Air', 'ppm': 0.0, 'phase': 'Recovery'})
-  for idx, v in enumerate(h2sSlice[:60]):
-    noise = float(np.random.normal(0, 0.004))
-    rawVal = round(float(v + noise), 4)
-    ppmVal = round(float(max(0.0, (v - 1.0) * 7.8)), 2)
-    temp = round(29.4 + 0.15 * np.cos(idx * 0.2), 1)
-    hum = round(65.0 + 0.2 * np.sin(idx * 0.1), 1)
-    fieldPoints.append({'s3': round(float(v), 4), 's3Raw': rawVal, 'temperature': temp, 'humidity': hum, 'trueGas': 'H2S', 'ppm': ppmVal, 'phase': 'H2SLeak'})
-  for idx, v in enumerate(airSlice[:15]):
-    noise = float(np.random.normal(0, 0.002))
-    rawVal = round(float(v + noise), 4)
-    temp = round(28.6, 1)
-    hum = round(64.5, 1)
-    fieldPoints.append({'s3': round(float(v), 4), 's3Raw': rawVal, 'temperature': temp, 'humidity': hum, 'trueGas': 'Air', 'ppm': 0.0, 'phase': 'Purge'})
-  return {
-    'fieldScenario': fieldPoints,
-    'H2SRun': [{'s3': round(float(v), 4), 's3Raw': round(float(v + np.random.normal(0, 0.003)), 4), 'temperature': 29.5, 'humidity': 65.2, 'trueGas': 'H2S', 'ppm': round(float(max(0.0, (v - 1.0) * 7.8)), 2), 'phase': 'H2SLeak'} for v in h2sSlice],
-    'CORun': [{'s3': round(float(v), 4), 's3Raw': round(float(v + np.random.normal(0, 0.003)), 4), 'temperature': 29.1, 'humidity': 63.8, 'trueGas': 'CO', 'ppm': round(float(max(0.0, (v - 1.0) * 820.0)), 1), 'phase': 'COPuff'} for v in coSlice],
-    'airRun': [{'s3': round(float(v), 4), 's3Raw': round(float(v + np.random.normal(0, 0.0015)), 4), 'temperature': 28.5, 'humidity': 64.0, 'trueGas': 'Air', 'ppm': 0.0, 'phase': 'Baseline'} for v in airSlice]
-  }
+    h2sDf = pd.read_csv('data/h2s_sensor_1_clean.csv')
+    nh3Df = pd.read_csv('data/nh3_sensor_1_clean.csv')
+    airDf = pd.read_csv('data/air_clean_sensor_1_clean.csv')
+
+    point_cols = [c for c in airDf.columns if c.startswith('Point_')]
+
+    # Pick representative pulses
+    # H2S: 10ppm pulse (Pulse 35)
+    h2s_pulse = h2sDf[h2sDf['Pulse_Index'] == 'Pulse_35'][point_cols].values[0].tolist() if 'Pulse_35' in h2sDf['Pulse_Index'].values else h2sDf[point_cols].iloc[-1].values.tolist()
+    # NH3: 50ppm pulse (Pulse 20)
+    nh3_pulse = nh3Df[nh3Df['Pulse_Index'] == 'Pulse_20'][point_cols].values[0].tolist() if 'Pulse_20' in nh3Df['Pulse_Index'].values else nh3Df[point_cols].iloc[20].values.tolist()
+    # Air Clean: Pulse 5
+    air_pulse = airDf[point_cols].iloc[5].values.tolist()
+
+    # Build sequence for Field Scenario: Baseline (Air) -> H2S Leak (Points 10 to 140) -> Recovery -> NH3 Exposure (Points 10 to 140) -> Purge
+    fieldPoints = []
+
+    # 1. Baseline Clean Air (25s)
+    for idx, v in enumerate(air_pulse[:25]):
+        noise = float(np.random.normal(0, 0.002))
+        fieldPoints.append({
+            's3': round(float(v), 4),
+            's3Raw': round(float(v + noise), 4),
+            'temperature': round(28.5 + 0.1 * np.sin(idx * 0.2), 1),
+            'humidity': round(64.0 + 0.3 * np.cos(idx * 0.1), 1),
+            'trueGas': 'Clean Air',
+            'trueppm': 0.0,
+            'phase': 'Baseline'
+        })
+
+    # 2. H2S Gas Leak Pulse (0s to 60s)
+    for idx, v in enumerate(h2s_pulse):
+        noise = float(np.random.normal(0, 0.003))
+        # Concentration increases during exposure then decays
+        ppm_est = 10.0 if (20 <= idx <= 125) else (10.0 * (v - 0.5) / 1.7 if v > 0.5 else 0.0)
+        fieldPoints.append({
+            's3': round(float(v), 4),
+            's3Raw': round(float(v + noise), 4),
+            'temperature': round(29.2 + 0.2 * np.sin(idx * 0.1), 1),
+            'humidity': round(65.1 + 0.1 * np.cos(idx * 0.1), 1),
+            'trueGas': 'H2S' if idx <= 140 else 'Clean Air',
+            'trueppm': round(float(max(0.0, ppm_est)), 1),
+            'phase': 'H2S Leakage' if idx <= 130 else 'Scrubber Purge'
+        })
+
+    # 3. Intermediate Recovery (20s)
+    for idx, v in enumerate(air_pulse[20:40]):
+        noise = float(np.random.normal(0, 0.002))
+        fieldPoints.append({
+            's3': round(float(v), 4),
+            's3Raw': round(float(v + noise), 4),
+            'temperature': 28.7,
+            'humidity': 64.2,
+            'trueGas': 'Clean Air',
+            'trueppm': 0.0,
+            'phase': 'Safe Baseline'
+        })
+
+    # 4. NH3 Industrial Release (0s to 60s)
+    for idx, v in enumerate(nh3_pulse):
+        noise = float(np.random.normal(0, 0.003))
+        ppm_est = 50.0 if (20 <= idx <= 125) else (50.0 * (v - 0.48) / 1.76 if v > 0.48 else 0.0)
+        fieldPoints.append({
+            's3': round(float(v), 4),
+            's3Raw': round(float(v + noise), 4),
+            'temperature': round(29.0 + 0.15 * np.cos(idx * 0.2), 1),
+            'humidity': round(63.8 - 0.1 * np.sin(idx * 0.1), 1),
+            'trueGas': 'NH3' if idx <= 140 else 'Clean Air',
+            'trueppm': round(float(max(0.0, ppm_est)), 1),
+            'phase': 'NH3 Exhaust' if idx <= 130 else 'Ventilation'
+        })
+
+    return {
+        'fieldScenario': fieldPoints,
+        'H2SRun': [{
+            's3': round(float(v), 4),
+            's3Raw': round(float(v + np.random.normal(0, 0.002)), 4),
+            'temperature': 29.4,
+            'humidity': 65.0,
+            'trueGas': 'H2S' if idx <= 140 else 'Clean Air',
+            'trueppm': 10.0 if (20 <= idx <= 125) else 0.0,
+            'phase': 'H2S 10ppm Test'
+        } for idx, v in enumerate(h2s_pulse)],
+        'NH3Run': [{
+            's3': round(float(v), 4),
+            's3Raw': round(float(v + np.random.normal(0, 0.002)), 4),
+            'temperature': 29.1,
+            'humidity': 63.5,
+            'trueGas': 'NH3' if idx <= 140 else 'Clean Air',
+            'trueppm': 50.0 if (20 <= idx <= 125) else 0.0,
+            'phase': 'NH3 50ppm Test'
+        } for idx, v in enumerate(nh3_pulse)],
+        'airRun': [{
+            's3': round(float(v), 4),
+            's3Raw': round(float(v + np.random.normal(0, 0.0015)), 4),
+            'temperature': 28.5,
+            'humidity': 64.0,
+            'trueGas': 'Clean Air',
+            'trueppm': 0.0,
+            'phase': 'Clean Air Baseline'
+        } for idx, v in enumerate(air_pulse)]
+    }
+
 scenarios = buildScenarios()
-def extractFeatures(w):
-  n = len(w)
-  meanVal = float(np.mean(w))
-  stdVal = float(np.std(w))
-  slopeVal = float((w[-1] - w[0]) / n)
-  minVal = float(np.min(w))
-  maxVal = float(np.max(w))
-  rngVal = maxVal - minVal
-  deltaVal = float(w[-1] - w[0])
-  sortedW = np.sort(w)
-  q25 = float(sortedW[int(n * 0.25)])
-  q75 = float(sortedW[int(n * 0.75)])
-  diffs = [w[i] - w[i - 1] for i in range(1, n)]
-  diffMean = float(np.mean(diffs)) if diffs else 0.0
-  diffStd = float(np.std(diffs)) if diffs else 0.0
-  return [meanVal, stdVal, maxVal, minVal, rngVal, deltaVal, slopeVal, diffMean, diffStd, q75 - q25]
+
+
 def runInference(windowValues, compS3):
-  tStart = time.perf_counter()
-  w = list(windowValues)
-  if len(w) < 20:
-    fillVal = w[0] if w else float(compS3)
-    w = [fillVal] * (20 - len(w)) + w
-  rawTensor = np.array(w[-20:], dtype=np.float32).reshape(1, 20, 1)
-  gasPreds, ppmPreds = model(rawTensor, training=False)
-  gasProbs = gasPreds.numpy()[0]
-  bestIdx = int(np.argmax(gasProbs))
-  predGas = classes[bestIdx]
-  conf = int(round(float(gasProbs[bestIdx]) * 100))
-  probMap = {classes[i]: round(float(gasProbs[i]), 4) for i in range(len(classes))}
-  compVal = float(compS3)
-  estimatedppm = round(float(max(0.0, ppmPreds.numpy()[0][0])), 2)
-  if predGas == 'Clean Air' or compVal <= 1.015:
-    predGas = 'Clean Air'
-    estimatedppm = 0.0
-    conf = max(conf, 98)
-  latencyMs = round((time.perf_counter() - tStart) * 1000, 2)
-  return {
-    'gas': predGas,
-    'confidence': conf,
-    'probabilities': probMap,
-    'estimatedppm': estimatedppm,
-    'latencyMs': latencyMs
-  }
+    tStart = time.perf_counter()
+    w = list(windowValues)
+    if len(w) < 20:
+        fillVal = w[0] if w else float(compS3)
+        w = [fillVal] * (20 - len(w)) + w
+
+    w_20 = w[-20:]
+    feat = extract_window_features(w_20, base_v=float(compS3))
+    featArr = np.array([feat], dtype=np.float32)
+
+    gasProbs = clf_win.predict_proba(featArr)[0]
+    bestIdx = int(np.argmax(gasProbs))
+    predGas = classes[bestIdx]
+    conf = int(round(float(gasProbs[bestIdx]) * 100))
+    probMap = {classes[i]: round(float(gasProbs[i]), 4) for i in range(len(classes))}
+
+    estimatedppm = round(float(max(0.0, reg_win.predict(featArr)[0])), 2)
+
+    # Baseline threshold guard
+    if float(compS3) <= 0.65 and predGas != 'Clean Air':
+        predGas = 'Clean Air'
+        estimatedppm = 0.0
+        conf = max(conf, 96)
+
+    latencyMs = round((time.perf_counter() - tStart) * 1000, 2)
+    return {
+        'gas': predGas,
+        'confidence': conf,
+        'probabilities': probMap,
+        'estimatedppm': estimatedppm,
+        'latencyMs': latencyMs
+    }
+
+
+def computeRiskLevel(gas, ppmVal, compVal):
+    risk = 'Normal'
+    if gas == 'H2S':
+        if ppmVal >= 50.0 or compVal >= 2.45:
+            risk = 'Emergency'
+        elif ppmVal >= 10.0 or compVal >= 2.30:
+            risk = 'Hazardous'
+        elif ppmVal >= 1.0 or compVal >= 1.05:
+            risk = 'Warning'
+    elif gas == 'NH3':
+        if ppmVal >= 100.0 or compVal >= 2.30:
+            risk = 'Emergency'
+        elif ppmVal >= 50.0 or compVal >= 2.26:
+            risk = 'Hazardous'
+        elif ppmVal >= 25.0 or compVal >= 1.10:
+            risk = 'Warning'
+    return risk
+
+
+# =========================================================================
+# REST API ENDPOINTS
+# =========================================================================
 @app.get('/health')
 def health():
-  return {'status': 'ok', 'model': 'MultiTask1DCNN'}
+    return {'status': 'ok', 'model': 'RandomForest_EdgeAI_DualMode'}
+
+@app.get('/api/metrics')
+def getMetrics():
+    metricsPath = 'dashboard/model_metrics.json'
+    if os.path.exists(metricsPath):
+        with open(metricsPath, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return meta
+
+@app.get('/api/profiles')
+def getProfiles():
+    profPath = 'dashboard/gas_profiles.json'
+    if os.path.exists(profPath):
+        with open(profPath, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+@app.get('/api/pulse_samples')
+def getPulseSamples():
+    samplePath = 'dashboard/pulse_samples.json'
+    if os.path.exists(samplePath):
+        with open(samplePath, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return []
+
+@app.post('/api/predict_pulse')
+async def predictPulse(req: Request):
+    data = await req.json()
+    points = data.get('points', [])
+    if len(points) != 250:
+        return JSONResponse({'error': 'Expected 250 points array'}, status_code=400)
+
+    tStart = time.perf_counter()
+    feat = extract_pulse_features(points)
+    featArr = np.array([feat], dtype=np.float32)
+
+    probs = clf_pulse.predict_proba(featArr)[0]
+    bestIdx = int(np.argmax(probs))
+    predGas = classes[bestIdx]
+    conf = int(round(float(probs[bestIdx]) * 100))
+    probMap = {classes[i]: round(float(probs[i]), 4) for i in range(len(classes))}
+
+    estimatedppm = round(float(max(0.0, reg_pulse.predict(featArr)[0])), 2)
+    latencyMs = round((time.perf_counter() - tStart) * 1000, 2)
+    risk = computeRiskLevel(predGas, estimatedppm, np.max(points))
+
+    return {
+        'gas': predGas,
+        'confidence': conf,
+        'probabilities': probMap,
+        'estimatedppm': estimatedppm,
+        'riskLevel': risk,
+        'latencyMs': latencyMs,
+        'features': {
+            'min': round(float(np.min(points)), 4),
+            'max': round(float(np.max(points)), 4),
+            'delta': round(float(np.max(points) - np.min(points)), 4),
+            'auc': round(float(np.sum(points)), 2),
+            'mean': round(float(np.mean(points)), 4),
+            'std': round(float(np.std(points)), 4)
+        }
+    }
+
+
+# =========================================================================
+# WEBSOCKET STREAMING
+# =========================================================================
 @app.websocket('/predict')
 async def predictWs(ws: WebSocket):
-  await ws.accept()
-  try:
-    while True:
-      msg = await ws.receive_text()
-      payload = json.loads(msg)
-      win = payload.get('window', payload.get('features', []))
-      compVal = payload.get('compS3', 1.0)
-      result = runInference(win, compVal)
-      await ws.send_text(json.dumps(result))
-  except WebSocketDisconnect:
-    pass
+    await ws.accept()
+    try:
+        while True:
+            msg = await ws.receive_text()
+            payload = json.loads(msg)
+            win = payload.get('window', payload.get('features', []))
+            compVal = payload.get('compS3', 1.0)
+            result = runInference(win, compVal)
+            await ws.send_text(json.dumps(result))
+    except WebSocketDisconnect:
+        pass
+
+
 @app.websocket('/stream')
 async def streamWs(ws: WebSocket):
-  await ws.accept()
-  state = {
-    'mode': 'fieldScenario',
-    'index': 0,
-    'isPlaying': True,
-    'speedMs': 1000,
-    'window': [],
-    'lastEma': None
-  }
-  async def listenCommands():
+    await ws.accept()
+    state = {
+        'mode': 'fieldScenario',
+        'index': 0,
+        'isPlaying': True,
+        'speedMs': 800,
+        'window': [],
+        'lastEma': None
+    }
+
+    async def listenCommands():
+        try:
+            while True:
+                msg = await ws.receive_text()
+                data = json.loads(msg)
+                action = data.get('action')
+                if action == 'setMode':
+                    newMode = data.get('mode', 'fieldScenario')
+                    if newMode in scenarios:
+                        state['mode'] = newMode
+                        state['index'] = 0
+                        state['window'] = []
+                        state['lastEma'] = None
+                elif action == 'togglePlay':
+                    state['isPlaying'] = not state['isPlaying']
+                elif action == 'pause':
+                    state['isPlaying'] = False
+                elif action == 'play':
+                    state['isPlaying'] = True
+                elif action == 'setSpeed':
+                    mult = float(data.get('multiplier', 1.0))
+                    state['speedMs'] = max(100, int(800 / mult))
+        except Exception:
+            pass
+
+    cmdTask = asyncio.create_task(listenCommands())
     try:
-      while True:
-        msg = await ws.receive_text()
-        data = json.loads(msg)
-        action = data.get('action')
-        if action == 'setMode':
-          newMode = data.get('mode', 'fieldScenario')
-          if newMode in scenarios:
-            state['mode'] = newMode
-            state['index'] = 0
-            state['window'] = []
-            state['lastEma'] = None
-        elif action == 'togglePlay':
-          state['isPlaying'] = not state['isPlaying']
-        elif action == 'pause':
-          state['isPlaying'] = False
-        elif action == 'play':
-          state['isPlaying'] = True
-        elif action == 'setSpeed':
-          mult = float(data.get('multiplier', 1.0))
-          state['speedMs'] = max(100, int(1000 / mult))
-    except Exception:
-      pass
-  cmdTask = asyncio.create_task(listenCommands())
-  try:
-    while True:
-      if state['isPlaying']:
-        series = scenarios.get(state['mode'], scenarios['fieldScenario'])
-        idx = state['index'] % len(series)
-        pt = series[idx]
-        state['index'] = (idx + 1) % len(series)
-        rawVal = float(pt['s3Raw'])
-        temp = float(pt['temperature'])
-        hum = float(pt['humidity'])
-        if state['lastEma'] is None:
-          state['lastEma'] = rawVal
-        else:
-          state['lastEma'] = 0.2 * rawVal + 0.8 * state['lastEma']
-        compFactor = 1.0 + 0.0035 * (temp - 25.0) + 0.0015 * (hum - 60.0)
-        compVal = state['lastEma'] / compFactor
-        state['window'].append(compVal)
-        if len(state['window']) > 20:
-          state['window'].pop(0)
-        feat = extractFeatures(state['window']) if len(state['window']) >= 3 else None
-        if len(state['window']) >= 3:
-          inf = runInference(state['window'], compVal)
-        else:
-          inf = {
-            'gas': 'Clean Air',
-            'confidence': 98,
-            'probabilities': {'Clean Air': 0.98, 'CO': 0.01, 'H2S': 0.01},
-            'estimatedppm': 0.0,
-            'latencyMs': 0.5
-          }
-        gas = inf['gas']
-        ppmVal = inf['estimatedppm']
-        risk = 'Normal'
-        if gas == 'H2S':
-          if ppmVal >= 10.0 or compVal >= 1.25:
-            risk = 'Emergency'
-          elif ppmVal >= 5.0 or compVal >= 1.10:
-            risk = 'Hazardous'
-          elif ppmVal >= 1.0 or compVal >= 1.03:
-            risk = 'Warning'
-        elif gas == 'CO':
-          if ppmVal >= 50.0:
-            risk = 'Hazardous'
-          elif ppmVal >= 25.0:
-            risk = 'Warning'
-        slopeVal = feat[6] if feat else 0.0
-        horizonSteps = [5, 10, 15, 20]
-        traj = [round(float(compVal + slopeVal * s), 3) for s in horizonSteps]
-        maxProj = max(compVal, *traj)
-        isEmerg = (gas == 'H2S' and maxProj >= 1.25) or (gas == 'H2S' and slopeVal > 0.008)
-        tte = None
-        if isEmerg:
-          rate = max(0.002, slopeVal)
-          tte = max(3, min(25, round((1.25 - compVal) / rate)))
-        packet = {
-          'timestamp': time.strftime('%I:%M:%S %p'),
-          's3': round(compVal, 4),
-          's3Raw': round(rawVal, 4),
-          'temperature': temp,
-          'humidity': hum,
-          'trueGas': pt['trueGas'],
-          'trueppm': pt['ppm'],
-          'phase': pt.get('phase', 'Monitoring'),
-          'gas': gas,
-          'confidence': inf['confidence'],
-          'probabilities': inf['probabilities'],
-          'estimatedppm': ppmVal,
-          'riskLevel': risk,
-          'features': {
-            'mean': round(feat[0], 5),
-            'std': round(feat[1], 5),
-            'max': round(feat[2], 5),
-            'min': round(feat[3], 5),
-            'range': round(feat[4], 5),
-            'delta': round(feat[5], 5),
-            'slope': round(feat[6], 5),
-            'diffmean': round(feat[7], 5),
-            'diffstd': round(feat[8], 5),
-            'iqr': round(feat[9], 5)
-          } if feat else None,
-          'prognostics': {
-            'trajectoryPoints': traj,
-            'maxProjectedS3': round(maxProj, 3),
-            'isImminentEmergency': isEmerg,
-            'timeToEmergencySec': tte
-          },
-          'latencyMs': inf['latencyMs'],
-          'frameIndex': idx,
-          'totalFrames': len(series),
-          'mode': state['mode'],
-          'isPlaying': state['isPlaying']
-        }
-        await ws.send_text(json.dumps(packet))
-      await asyncio.sleep(state['speedMs'] / 1000.0)
-  except WebSocketDisconnect:
-    pass
-  finally:
-    cmdTask.cancel()
+        while True:
+            if state['isPlaying']:
+                series = scenarios.get(state['mode'], scenarios['fieldScenario'])
+                idx = state['index'] % len(series)
+                pt = series[idx]
+                state['index'] = (idx + 1) % len(series)
+
+                rawVal = float(pt['s3Raw'])
+                temp = float(pt['temperature'])
+                hum = float(pt['humidity'])
+
+                if state['lastEma'] is None:
+                    state['lastEma'] = rawVal
+                else:
+                    state['lastEma'] = 0.2 * rawVal + 0.8 * state['lastEma']
+
+                compFactor = 1.0 + 0.0035 * (temp - 25.0) + 0.0015 * (hum - 60.0)
+                compVal = state['lastEma'] / compFactor
+
+                state['window'].append(compVal)
+                if len(state['window']) > 20:
+                    state['window'].pop(0)
+
+                inf = runInference(state['window'], compVal)
+                gas = inf['gas']
+                ppmVal = inf['estimatedppm']
+                risk = computeRiskLevel(gas, ppmVal, compVal)
+
+                slopeVal = (state['window'][-1] - state['window'][0]) / max(len(state['window']), 1) if len(state['window']) > 1 else 0.0
+                horizonSteps = [5, 10, 15, 20]
+                traj = [round(float(compVal + slopeVal * s), 3) for s in horizonSteps]
+                maxProj = max(compVal, *traj)
+                isEmerg = (gas == 'H2S' and maxProj >= 2.45) or (gas == 'H2S' and slopeVal > 0.015)
+                tte = None
+                if isEmerg:
+                    rate = max(0.002, slopeVal)
+                    tte = max(3, min(25, round((2.45 - compVal) / rate)))
+
+                packet = {
+                    'timestamp': time.strftime('%I:%M:%S %p'),
+                    's3': round(compVal, 4),
+                    's3Raw': round(rawVal, 4),
+                    'temperature': temp,
+                    'humidity': hum,
+                    'trueGas': pt['trueGas'],
+                    'trueppm': pt['trueppm'],
+                    'phase': pt.get('phase', 'Monitoring'),
+                    'gas': gas,
+                    'confidence': inf['confidence'],
+                    'probabilities': inf['probabilities'],
+                    'estimatedppm': ppmVal,
+                    'riskLevel': risk,
+                    'features': {
+                        'mean': round(float(np.mean(state['window'])), 4),
+                        'std': round(float(np.std(state['window'])), 4),
+                        'max': round(float(np.max(state['window'])), 4),
+                        'min': round(float(np.min(state['window'])), 4),
+                        'range': round(float(np.max(state['window']) - np.min(state['window'])), 4),
+                        'slope': round(float(slopeVal), 5)
+                    },
+                    'prognostics': {
+                        'trajectoryPoints': traj,
+                        'maxProjectedS3': round(maxProj, 3),
+                        'isImminentEmergency': isEmerg,
+                        'timeToEmergencySec': tte
+                    },
+                    'latencyMs': inf['latencyMs'],
+                    'frameIndex': idx,
+                    'totalFrames': len(series),
+                    'mode': state['mode'],
+                    'isPlaying': state['isPlaying']
+                }
+                await ws.send_text(json.dumps(packet))
+            await asyncio.sleep(state['speedMs'] / 1000.0)
+    except WebSocketDisconnect:
+        pass
+    finally:
+        cmdTask.cancel()
+
+
 if __name__ == '__main__':
-  uvicorn.run(app, host='127.0.0.1', port=8001)
+    uvicorn.run(app, host='127.0.0.1', port=8001)

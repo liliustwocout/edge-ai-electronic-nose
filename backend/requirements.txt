@@ -1,6 +1,7 @@
-websockets
-scikit-learn
-tensorflow
-pandas
-uvicorn
 fastapi
+uvicorn
+scikit-learn
+pandas
+numpy
+scipy
+websockets
