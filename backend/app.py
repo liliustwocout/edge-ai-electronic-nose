@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, JSONResponse
 from backend.train import extract_window_features, extract_pulse_features, parse_pulse_num
+from backend.firebase import FirebaseService
 
 classesPath = 'backend/classes.json'
 modelGasPath = 'backend/model_gas.pkl'
@@ -21,6 +22,8 @@ modelPulsePpmPath = 'backend/model_pulse_ppm.pkl'
 if not (os.path.exists(classesPath) and os.path.exists(modelGasPath) and os.path.exists(modelPpmPath)):
     from backend.train import trainModel
     trainModel()
+
+firebaseService = FirebaseService()
 
 app = FastAPI(title="Electronic Nose Edge AI Gateway")
 app.add_middleware(
@@ -244,13 +247,9 @@ def getPulseSamples():
             return json.load(f)
     return []
 
-@app.post('/api/predict_pulse')
-async def predictPulse(req: Request):
-    data = await req.json()
-    points = data.get('points', [])
+def runPulseInference(points):
     if len(points) != 250:
-        return JSONResponse({'error': 'Expected 250 points array'}, status_code=400)
-
+        return None
     tStart = time.perf_counter()
     feat = extract_pulse_features(points)
     featArr = np.array([feat], dtype=np.float32)
@@ -281,6 +280,137 @@ async def predictPulse(req: Request):
             'std': round(float(np.std(points)), 4)
         }
     }
+
+@app.post('/api/predict_pulse')
+async def predictPulse(req: Request):
+    data = await req.json()
+    points = data.get('points', [])
+    if len(points) != 250:
+        return JSONResponse({'error': 'Expected 250 points array'}, status_code=400)
+    res = runPulseInference(points)
+    return res
+
+@app.get('/api/firebase/status')
+def getFirebaseStatus():
+    return firebaseService.getStatus()
+
+@app.get('/api/firebase/latest')
+def getFirebaseLatest():
+    latest = firebaseService.getLatest()
+    if latest:
+        v1 = float(latest.get('voltage1', 1.0))
+        inf = runInference([v1] * 20, v1)
+        risk = computeRiskLevel(inf['gas'], inf['estimatedppm'], v1)
+        inf['riskLevel'] = risk
+        return {
+            'telemetry': latest,
+            'inference': inf
+        }
+    return {'telemetry': None, 'inference': None}
+
+@app.post('/api/firebase/air_type')
+async def setFirebaseAir(req: Request):
+    data = await req.json()
+    air = data.get('airType', 'CleanAir')
+    firebaseService.setAirType(air)
+    return {'status': 'ok', 'activeAir': air}
+
+@app.post('/api/firebase/flush')
+def flushFirebase():
+    firebaseService.flushDisk()
+    return {'status': 'ok', 'message': 'Buffer flushed to disk'}
+
+@app.websocket('/ws/live_experiment')
+async def liveExperimentWs(ws: WebSocket):
+    await ws.accept()
+    loop = asyncio.get_running_loop()
+    queue = asyncio.Queue(maxsize=200)
+
+    def onPacket(packet):
+        try:
+            loop.call_soon_threadsafe(queue.put_nowait, packet)
+        except Exception:
+            pass
+
+    firebaseService.subscribe(onPacket)
+
+    state = {
+        'recentWindow': [],
+        'cyclePoints': [None] * 250,
+        'cycleCount': 1,
+        'lastPoint': -1
+    }
+
+    async def listenClient():
+        try:
+            while True:
+                msg = await ws.receive_text()
+                cmd = json.loads(msg)
+                action = cmd.get('action')
+                if action == 'setAirType':
+                    firebaseService.setAirType(cmd.get('airType', 'CleanAir'))
+                elif action == 'flush':
+                    firebaseService.flushDisk()
+        except Exception:
+            pass
+
+    listenTask = asyncio.create_task(listenClient())
+
+    try:
+        # Send initial connection state
+        init_st = firebaseService.getStatus()
+        await ws.send_text(json.dumps({
+            'type': 'connected',
+            'status': init_st
+        }))
+
+        while True:
+            packet = await queue.get()
+            pt = int(packet.get('point', 0))
+            v1 = float(packet.get('voltage1', 0.0))
+            v2 = float(packet.get('voltage2', 0.0))
+
+            cycleSummary = None
+            # Cycle wrap-around detection: e.g. from ~230+ back to <30
+            if state['lastPoint'] >= 200 and pt < 30:
+                state['cycleCount'] += 1
+                valid_pts = [p for p in state['cyclePoints'] if p is not None]
+                if len(valid_pts) >= 150:
+                    fill_val = float(np.mean(valid_pts))
+                    full_p = [p if p is not None else fill_val for p in state['cyclePoints']]
+                    cycleSummary = runPulseInference(full_p)
+                state['cyclePoints'] = [None] * 250
+
+            state['lastPoint'] = pt
+            if 0 <= pt < 250:
+                state['cyclePoints'][pt] = v1
+
+            state['recentWindow'].append(v1)
+            if len(state['recentWindow']) > 20:
+                state['recentWindow'].pop(0)
+
+            win_inf = runInference(state['recentWindow'], v1)
+            risk = computeRiskLevel(win_inf['gas'], win_inf['estimatedppm'], v1)
+            win_inf['riskLevel'] = risk
+
+            response = {
+                'type': 'telemetry',
+                'cycle': state['cycleCount'],
+                'point': pt,
+                'voltage1': v1,
+                'voltage2': v2,
+                'telemetry': packet,
+                'inference': win_inf,
+                'cycleSummary': cycleSummary,
+                'timestamp': packet.get('timestamp')
+            }
+            await ws.send_text(json.dumps(response))
+    except WebSocketDisconnect:
+        pass
+    finally:
+        firebaseService.unsubscribe(onPacket)
+        listenTask.cancel()
+
 
 
 # =========================================================================

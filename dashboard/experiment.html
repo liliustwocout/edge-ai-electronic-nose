@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Electronic Nose Live Experiment | WaveCycle Oscilloscope &amp; Edge AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #070d18; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 15px rgba(56, 189, 248, 0.2); }
+      50% { box-shadow: 0 0 25px rgba(56, 189, 248, 0.45); }
+    }
+    .pulse-glow { animation: pulseGlow 2.5s infinite; }
+
+    @keyframes sweepBlink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .sweep-indicator { animation: sweepBlink 1s infinite; }
+
+    .chart-container-bg {
+      background: radial-gradient(circle at 50% 30%, #0d172e 0%, #080d1a 100%);
+    }
+  </style>
+</head>
+<body class="bg-[#060a12] text-slate-200 font-sans min-h-screen flex flex-col antialiased selection:bg-sky-500/30">
+
+  <!-- Top Navigation Bar -->
+  <header class="sticky top-0 z-50 flex items-center justify-between h-14 px-4 sm:px-6 bg-[#090f1e]/90 backdrop-blur-md border-b border-slate-800/80 shadow-lg">
+    <div class="flex items-center gap-3.5">
+      <a href="/dashboard/index.html" class="flex items-center gap-2 text-slate-400 hover:text-white px-2.5 py-1.5 rounded-md hover:bg-slate-800/60 transition-colors text-xs font-medium">
+        <i data-lucide="arrow-left" class="w-4 h-4"></i>
+        <span class="hidden sm:inline">Về Dashboard Tổng Quan</span>
+      </a>
+      <div class="h-4 w-[1px] bg-slate-700 hidden sm:block"></div>
+      <div class="flex items-center gap-2">
+        <div class="p-1.5 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-400">
+          <i data-lucide="flask-conical" class="w-4 h-4"></i>
+        </div>
+        <div class="text-[15px] font-semibold tracking-tight text-white flex items-center gap-2">
+          <span>Phòng Thực Nghiệm</span>
+          <span class="text-sky-400 text-xs px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 font-normal">Realtime Firebase</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status and Controls -->
+    <div class="flex items-center gap-2 sm:gap-3">
+      <!-- Firebase Live Badge -->
+      <div id="connectionBadge" class="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+        </span>
+        <span id="connectionText">RTDB Connected (210ms)</span>
+      </div>
+
+      <!-- Action Buttons -->
+      <button id="btnPauseResume" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 transition-colors">
+        <i data-lucide="pause" class="w-3.5 h-3.5" id="pauseIcon"></i>
+        <span id="pauseText">Tạm Dừng</span>
+      </button>
+
+      <button id="btnExportCsv" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-xs text-sky-300 transition-colors">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+        <span class="hidden md:inline">Xuất CSV</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="flex-1 max-w-[1920px] w-full mx-auto p-3.5 sm:p-5 flex flex-col gap-4">
+
+    <!-- OSCILLOSCOPE MAIN SCREEN (Matching User Reference Image) -->
+    <section class="rounded-xl border border-slate-800/90 chart-container-bg p-4 sm:p-5 shadow-2xl relative overflow-hidden">
+      
+      <!-- Screen Top Bar: Title, Toggles, and Meta -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+        <!-- WaveCycle Title & Gas Status -->
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 text-cyan-400">
+            <i data-lucide="activity" class="w-5 h-5 sweep-indicator"></i>
+            <h2 id="waveCycleTitle" class="text-base sm:text-lg font-bold tracking-tight text-white flex items-center gap-2">
+              WaveCycle #1 &bull; <span id="telemetryGasTitle" class="text-emerald-400">Clean Air</span>
+            </h2>
+          </div>
+          <span id="cyclePointBadge" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800/80 text-sky-300 border border-slate-700">
+            Point: <span id="currentPointNum" class="font-bold">0</span>/249
+          </span>
+        </div>
+
+        <!-- Toggles: Per Point vs Per Second & Despike & Wave Style -->
+        <div class="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+          <!-- Wave Style Toggle: Continuous Wave (Default) vs Sweep Overwrite -->
+          <button id="btnToggleWaveStyle" class="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border border-sky-500/40 bg-sky-950/20 text-sky-300 hover:bg-sky-900/30 transition-colors" title="Chế độ hiển thị: Sóng Liền Mạch theo chu kỳ hoặc Quét Đè Dao Động Ký">
+            <i data-lucide="waves" class="w-3 h-3"></i>
+            <span id="waveStyleLabel">Sóng: Liền Mạch</span>
+          </button>
+
+          <!-- Hardware Despike Filter Toggle -->
+          <button id="btnToggleDespike" class="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border border-purple-500/40 bg-purple-950/20 text-purple-300 hover:bg-purple-900/30 transition-colors" title="Loại bỏ gai phần cứng tại mốc ~điểm 125">
+            <i data-lucide="sparkles" class="w-3 h-3"></i>
+            <span id="despikeLabel">Despike: Bật</span>
+          </button>
+
+          <!-- Ghost Trace Toggle -->
+          <button id="btnToggleGhost" class="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-slate-700/50 transition-colors" title="Hiển thị đường sóng chu kỳ trước để so sánh">
+            <i data-lucide="copy" class="w-3 h-3"></i>
+            <span id="ghostLabel">Ghost Trace: Bật</span>
+          </button>
+
+          <!-- Per Point / Per Second Mode Buttons (Matches Image 2) -->
+          <div class="inline-flex rounded-lg p-0.5 bg-slate-950 border border-slate-800 text-xs">
+            <button id="btnModePoint" class="px-3 py-1 rounded-md bg-gradient-to-r from-sky-600 to-blue-600 text-white font-medium shadow-sm transition-all">
+              Per Point (0-249)
+            </button>
+            <button id="btnModeSecond" class="px-3 py-1 rounded-md text-slate-400 hover:text-slate-200 transition-all">
+              Per Second (0-60s)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Subheader Info & Legend Bar (Matches Image 2) -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2.5 text-xs text-slate-400">
+        <div class="flex items-center gap-3">
+          <span id="channelTelemetryInfo" class="text-slate-300 font-medium">
+            Channel: <span class="text-white font-semibold" id="channelName">Clean Air</span> &nbsp;&bull;&nbsp; Telemetry: <span class="text-emerald-400 font-semibold" id="telemetryStatus">Clean Air</span>
+          </span>
+          <span class="text-slate-600 hidden md:inline">|</span>
+          <span id="liveTimestampClock" class="font-mono text-slate-400">00:00:00 AM</span>
+        </div>
+
+        <!-- Legend (Matches Image 2) -->
+        <div class="flex items-center gap-4 text-xs font-medium">
+          <div class="flex items-center gap-1.5">
+            <span class="w-3.5 h-3.5 rounded-sm border-2 border-cyan-400 bg-cyan-500/20 inline-block"></span>
+            <span class="text-cyan-300">Voltage 1 (MQ135)</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-3.5 h-3.5 rounded-sm border-2 border-emerald-400 bg-emerald-500/20 inline-block"></span>
+            <span class="text-emerald-300">Voltage 2 (MQ136)</span>
+          </div>
+          <div id="ghostLegend" class="flex items-center gap-1.5 text-slate-500">
+            <span class="w-3.5 h-0.5 border-b-2 border-dashed border-slate-500 inline-block"></span>
+            <span>V1 Trước Đó</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chart Canvas (Oscilloscope View) -->
+      <div class="relative w-full h-[320px] sm:h-[400px] lg:h-[440px] mt-1">
+        <canvas id="oscilloscopeChart"></canvas>
+      </div>
+
+      <!-- Sweep Progress Bar (0 to 249 points / 60 seconds) -->
+      <div class="mt-2.5 flex items-center gap-3">
+        <span class="text-[11px] font-mono text-slate-400 whitespace-nowrap">Tiến trình chu kỳ:</span>
+        <div class="flex-1 h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+          <div id="cycleProgressBar" class="h-full bg-gradient-to-r from-sky-500 via-cyan-400 to-emerald-400 transition-all duration-150" style="width: 0%;"></div>
+        </div>
+        <span id="cycleProgressPercent" class="text-[11px] font-mono text-cyan-300 w-12 text-right">0%</span>
+      </div>
+    </section>
+
+    <!-- REALTIME EDGE AI & TELEMETRY DASHBOARD -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      
+      <!-- Column 1: Live AI Classification Card -->
+      <div class="rounded-xl border border-slate-800 bg-[#090f1f]/80 backdrop-blur-sm p-4 flex flex-col justify-between shadow-lg">
+        <div>
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
+            <div class="flex items-center gap-2 text-fuchsia-400 text-xs font-semibold uppercase tracking-wider">
+              <i data-lucide="cpu" class="w-4 h-4"></i>
+              <span>Mô Hình Edge AI (Phân Loại Khí)</span>
+            </div>
+            <span class="text-[11px] px-2 py-0.5 rounded bg-fuchsia-950/40 border border-fuchsia-500/30 text-fuchsia-300 font-mono" id="aiLatencyBadge">
+              ~2.4 ms
+            </span>
+          </div>
+
+          <!-- Main Predicted Gas Banner -->
+          <div class="mt-4 p-4 rounded-xl border border-slate-800 bg-slate-950/60 flex items-center justify-between" id="aiGasCard">
+            <div>
+              <div class="text-xs text-slate-400 font-medium">Khí Nhận Diện Thời Gian Thực</div>
+              <div class="text-2xl sm:text-3xl font-extrabold tracking-tight text-emerald-400 mt-1" id="predictedGasName">
+                Clean Air
+              </div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-slate-400">Độ Tin Cậy</div>
+              <div class="text-2xl sm:text-3xl font-bold font-mono text-white mt-1" id="predictedConfidence">
+                98%
+              </div>
+            </div>
+          </div>
+
+          <!-- Probabilities breakdown -->
+          <div class="mt-4 space-y-2.5">
+            <div>
+              <div class="flex justify-between text-xs text-slate-300 mb-1">
+                <span>Clean Air</span>
+                <span class="font-mono text-emerald-400" id="probCleanAir">98.0%</span>
+              </div>
+              <div class="h-1.5 bg-slate-950 rounded-full overflow-hidden">
+                <div id="barProbCleanAir" class="h-full bg-emerald-500 transition-all duration-200" style="width: 98%;"></div>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs text-slate-300 mb-1">
+                <span>H2S (Hydrogen Sulfide)</span>
+                <span class="font-mono text-rose-400" id="probH2S">1.5%</span>
+              </div>
+              <div class="h-1.5 bg-slate-950 rounded-full overflow-hidden">
+                <div id="barProbH2S" class="h-full bg-rose-500 transition-all duration-200" style="width: 1.5%;"></div>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs text-slate-300 mb-1">
+                <span>NH3 (Ammonia)</span>
+                <span class="font-mono text-indigo-400" id="probNH3">0.5%</span>
+              </div>
+              <div class="h-1.5 bg-slate-950 rounded-full overflow-hidden">
+                <div id="barProbNH3" class="h-full bg-indigo-500 transition-all duration-200" style="width: 0.5%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-500 flex justify-between items-center">
+          <span>RandomForest Dual-Mode (20-Window &amp; 250-Pulse)</span>
+          <span class="text-slate-400 font-mono">v1.2</span>
+        </div>
+      </div>
+
+      <!-- Column 2: Estimated PPM & Risk Assessment -->
+      <div class="rounded-xl border border-slate-800 bg-[#090f1f]/80 backdrop-blur-sm p-4 flex flex-col justify-between shadow-lg">
+        <div>
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
+            <div class="flex items-center gap-2 text-amber-400 text-xs font-semibold uppercase tracking-wider">
+              <i data-lucide="gauge" class="w-4 h-4"></i>
+              <span>Nồng Độ &amp; Mức Độ Rủi Ro</span>
+            </div>
+            <span id="riskBadge" class="px-2.5 py-0.5 rounded text-xs font-semibold bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 font-mono">
+              Bình Thường (Normal)
+            </span>
+          </div>
+
+          <!-- Estimated PPM Metric -->
+          <div class="mt-4 grid grid-cols-2 gap-3">
+            <div class="p-3.5 rounded-xl border border-slate-800 bg-slate-950/60">
+              <div class="text-xs text-slate-400">Nồng Độ Ước Tính</div>
+              <div class="text-2xl sm:text-3xl font-bold font-mono text-cyan-300 mt-1" id="kpiPpmVal">
+                0.0 <span class="text-xs font-normal text-slate-400">ppm</span>
+              </div>
+              <div class="text-[10px] text-slate-500 mt-1">RandomForest Regressor</div>
+            </div>
+
+            <div class="p-3.5 rounded-xl border border-slate-800 bg-slate-950/60">
+              <div class="text-xs text-slate-400">Đỉnh Sóng Chu Kỳ (Max V1)</div>
+              <div class="text-2xl sm:text-3xl font-bold font-mono text-amber-300 mt-1" id="kpiPeakV1">
+                2.95 <span class="text-xs font-normal text-slate-400">V</span>
+              </div>
+              <div class="text-[10px] text-slate-500 mt-1">Điểm đỉnh: <span id="kpiPeakPoint">126</span></div>
+            </div>
+          </div>
+
+          <!-- Dynamic Feature Extraction Preview -->
+          <div class="mt-4 p-3 rounded-lg border border-slate-800/60 bg-slate-950/40">
+            <div class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Đặc Trưng Trượt (Sliding Features - 20 pts)</div>
+            <div class="grid grid-cols-3 gap-2 text-xs font-mono">
+              <div class="bg-slate-900/60 p-1.5 rounded border border-slate-800">
+                <div class="text-[10px] text-slate-500">Mean V1</div>
+                <div id="featMean" class="text-slate-200 font-semibold mt-0.5">2.593 V</div>
+              </div>
+              <div class="bg-slate-900/60 p-1.5 rounded border border-slate-800">
+                <div class="text-[10px] text-slate-500">Std Dev</div>
+                <div id="featStd" class="text-slate-200 font-semibold mt-0.5">0.012 V</div>
+              </div>
+              <div class="bg-slate-900/60 p-1.5 rounded border border-slate-800">
+                <div class="text-[10px] text-slate-500">Slope dV/dt</div>
+                <div id="featSlope" class="text-slate-200 font-semibold mt-0.5">+0.002/s</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
+          <span class="flex items-center gap-1.5">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+            <span>Ngưỡng an toàn: H2S &lt; 1 ppm &bull; NH3 &lt; 25 ppm</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Column 3: Live Hardware Telemetry Packet -->
+      <div class="rounded-xl border border-slate-800 bg-[#090f1f]/80 backdrop-blur-sm p-4 flex flex-col justify-between shadow-lg">
+        <div>
+          <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
+            <div class="flex items-center gap-2 text-sky-400 text-xs font-semibold uppercase tracking-wider">
+              <i data-lucide="binary" class="w-4 h-4"></i>
+              <span>Dữ Liệu Mạch Thu (Hardware Telemetry)</span>
+            </div>
+            <span class="text-slate-500 font-mono text-[11px]" id="rawPacketRate">~4.2 Hz</span>
+          </div>
+
+          <!-- Parameter Table -->
+          <div class="mt-3.5 space-y-2 text-xs font-mono">
+            <div class="flex items-center justify-between p-2 rounded bg-slate-950/60 border border-slate-800/50">
+              <span class="text-slate-400">voltage1 (MQ135):</span>
+              <span class="text-cyan-300 font-bold" id="telemetryV1">2.59363 V</span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded bg-slate-950/60 border border-slate-800/50">
+              <span class="text-slate-400">voltage2 (MQ136):</span>
+              <span class="text-emerald-300 font-bold" id="telemetryV2">0.58513 V</span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded bg-slate-950/60 border border-slate-800/50">
+              <span class="text-slate-400">sensor1 (Raw ADC):</span>
+              <span class="text-slate-200" id="telemetrySensor1">20749</span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded bg-slate-950/60 border border-slate-800/50">
+              <span class="text-slate-400">sensor2 (Raw ADC):</span>
+              <span class="text-slate-200" id="telemetrySensor2">4681</span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded bg-slate-950/60 border border-slate-800/50">
+              <span class="text-slate-400">dac_voltage &bull; pulse:</span>
+              <span class="text-slate-300"><span id="telemetryDac">0.0</span>V &bull; <span id="telemetryPulse">0</span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500">
+          <span>Khí Mục Tiêu:</span>
+          <select id="selectGasChannel" class="bg-slate-900 border border-slate-700 text-slate-200 rounded px-2 py-0.5 text-xs focus:outline-none focus:border-sky-500">
+            <option value="CleanAir" selected>CleanAir Node</option>
+            <option value="H2S">H2S Node</option>
+            <option value="NH3">NH3 Node</option>
+            <option value="MixedAir">MixedAir Node</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- WAVECYCLE HISTORY LOG TABLE -->
+    <section class="rounded-xl border border-slate-800 bg-[#090f1f]/90 backdrop-blur-sm p-4 sm:p-5 shadow-lg">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+        <div class="flex items-center gap-2">
+          <i data-lucide="history" class="w-4 h-4 text-slate-400"></i>
+          <h3 class="text-sm font-bold text-white tracking-tight">Lịch Sử Các Chu Kỳ Sóng Đã Ghi (WaveCycle Log)</h3>
+          <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300" id="completedCyclesCount">0 chu kỳ</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btnClearHistory" class="px-2.5 py-1 rounded text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors">
+            Xóa Lịch Sử
+          </button>
+          <button id="btnDownloadCyclesCsv" class="px-3 py-1 rounded text-xs bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 font-medium transition-colors flex items-center gap-1">
+            <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i>
+            Tải File Báo Cáo CSV
+          </button>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto mt-3">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="border-b border-slate-800 text-slate-400 font-semibold font-mono">
+              <th class="py-2.5 px-3">Chu Kỳ</th>
+              <th class="py-2.5 px-3">Thời Gian</th>
+              <th class="py-2.5 px-3">Khí Phân Loại</th>
+              <th class="py-2.5 px-3">Nồng Độ (ppm)</th>
+              <th class="py-2.5 px-3">Đỉnh V1 (V)</th>
+              <th class="py-2.5 px-3">Min V1 (V)</th>
+              <th class="py-2.5 px-3">Độ Lệch &Delta;V</th>
+              <th class="py-2.5 px-3">Diện Tích AUC</th>
+              <th class="py-2.5 px-3">Rủi Ro</th>
+            </tr>
+          </thead>
+          <tbody id="cycleHistoryTableBody" class="divide-y divide-slate-800/60 font-mono text-slate-300">
+            <tr>
+              <td colspan="9" class="py-6 text-center text-slate-500 italic">
+                Đang chờ hoàn thành chu kỳ sóng đầu tiên (WaveCycle #1)...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Application Logic -->
+  <script>
+    class ExperimentApp {
+      constructor() {
+        // State
+        this.currentCycle = 1;
+        this.lastPoint = -1;
+        this.displayMode = 'point'; // 'point' (0-249) or 'second' (0-60s)
+        this.waveStyle = 'continuous'; // 'continuous' (liền mạch theo chu kỳ) or 'sweep' (quét đè)
+        this.despikeEnabled = true;
+        this.ghostTraceEnabled = true;
+        this.isPaused = false;
+        
+        // 250 data points buffer for 0 - 249 cycle
+        this.v1Points = new Array(250).fill(null);
+        this.v2Points = new Array(250).fill(null);
+        this.ghostV1Points = new Array(250).fill(null);
+
+        // Window of recent values for live stats
+        this.recentWindow = [];
+        
+        // Recording / CSV buffer
+        this.recordedPackets = [];
+        this.completedCycles = [];
+        
+        // WebSocket connection
+        this.ws = null;
+        this.reconnectTimer = null;
+
+        // Peak tracking for current cycle
+        this.cycleMaxV1 = 0.0;
+        this.cycleMinV1 = 99.0;
+        this.cyclePeakPoint = 0;
+        this.cycleStartTime = new Date();
+      }
+
+      init() {
+        lucide.createIcons();
+        this.initChart();
+        this.bindEvents();
+        this.startClock();
+        this.connectBackendWs();
+      }
+
+      startClock() {
+        setInterval(() => {
+          const now = new Date();
+          const clockEl = document.getElementById('liveTimestampClock');
+          if (clockEl) {
+            clockEl.innerText = now.toLocaleTimeString('en-US', { hour12: true });
+          }
+        }, 1000);
+      }
+
+      initChart() {
+        const ctx = document.getElementById('oscilloscopeChart').getContext('2d');
+
+        // Labels: 0 to 249
+        this.pointLabels = Array.from({ length: 250 }, (_, i) => i);
+        this.secondLabels = Array.from({ length: 250 }, (_, i) => ((i / 249) * 60).toFixed(1) + 's');
+
+        const labels = this.displayMode === 'point' ? this.pointLabels : this.secondLabels;
+
+        this.chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: 'Voltage 1 (MQ135)',
+                data: this.v1Points,
+                borderColor: '#00e5ff',
+                backgroundColor: 'rgba(0, 229, 255, 0.04)',
+                borderWidth: 2.2,
+                pointRadius: (ctx) => {
+                  // Highlight the current active point
+                  const idx = ctx.dataIndex;
+                  return idx === this.lastPoint ? 5 : 0;
+                },
+                pointBackgroundColor: '#ffffff',
+                pointBorderColor: '#00e5ff',
+                pointBorderWidth: 2,
+                tension: 0.2,
+                spanGaps: true,
+                fill: false
+              },
+              {
+                label: 'Voltage 2 (MQ136)',
+                data: this.v2Points,
+                borderColor: '#00e676',
+                backgroundColor: 'rgba(0, 230, 118, 0.08)',
+                borderWidth: 2.0,
+                pointRadius: (ctx) => {
+                  const idx = ctx.dataIndex;
+                  return idx === this.lastPoint ? 5 : 0;
+                },
+                pointBackgroundColor: '#ffffff',
+                pointBorderColor: '#00e676',
+                pointBorderWidth: 2,
+                tension: 0.2,
+                spanGaps: true,
+                fill: false
+              },
+              {
+                label: 'Ghost V1 (Previous Cycle)',
+                data: this.ghostV1Points,
+                borderColor: 'rgba(148, 163, 184, 0.35)',
+                borderWidth: 1.5,
+                borderDash: [4, 4],
+                pointRadius: 0,
+                tension: 0.2,
+                spanGaps: true,
+                fill: false,
+                hidden: !this.ghostTraceEnabled
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false, // Turn off for real-time oscilloscope performance
+            interaction: {
+              intersect: false,
+              mode: 'index'
+            },
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: this.displayMode === 'point' ? 'Cycle Point (0 - 249)' : 'Time (0 - 60s)',
+                  color: '#94a3b8',
+                  font: { family: 'Inter', size: 12, weight: '500' }
+                },
+                grid: {
+                  color: 'rgba(51, 65, 85, 0.35)',
+                  drawTicks: true
+                },
+                ticks: {
+                  color: '#64748b',
+                  font: { family: 'JetBrains Mono', size: 11 },
+                  callback: (val, idx) => {
+                    // Match ticks from reference Image 2: 0, 18, 36, 54, 72, 90, 108, 126, 144, 162, 180, 198, 216, 234
+                    const p = this.pointLabels[idx];
+                    if (this.displayMode === 'point') {
+                      return p % 18 === 0 ? p : null;
+                    } else {
+                      return p % 18 === 0 ? ((p / 249) * 60).toFixed(0) + 's' : null;
+                    }
+                  },
+                  autoSkip: false
+                }
+              },
+              y: {
+                min: 0.0,
+                max: 3.5,
+                title: {
+                  display: true,
+                  text: 'Voltage (V)',
+                  color: '#94a3b8',
+                  font: { family: 'Inter', size: 12, weight: '500' }
+                },
+                grid: {
+                  color: 'rgba(51, 65, 85, 0.4)',
+                  drawTicks: true
+                },
+                ticks: {
+                  stepSize: 0.5,
+                  color: '#64748b',
+                  font: { family: 'JetBrains Mono', size: 11 },
+                  callback: (val) => val.toFixed(1)
+                }
+              }
+            },
+            plugins: {
+              legend: {
+                display: false // Using custom top legend matching reference image
+              },
+              tooltip: {
+                enabled: true,
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                titleColor: '#38bdf8',
+                bodyColor: '#f1f5f9',
+                borderColor: '#334155',
+                borderWidth: 1,
+                padding: 10,
+                displayColors: true,
+                callbacks: {
+                  title: (items) => {
+                    const idx = items[0].dataIndex;
+                    const sec = ((idx / 249) * 60).toFixed(2);
+                    return `Point ${idx} (${sec}s)`;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      bindEvents() {
+        // Mode toggle: Point vs Second
+        const btnPoint = document.getElementById('btnModePoint');
+        const btnSecond = document.getElementById('btnModeSecond');
+        
+        btnPoint.addEventListener('click', () => {
+          this.displayMode = 'point';
+          btnPoint.className = 'px-3 py-1 rounded-md bg-gradient-to-r from-sky-600 to-blue-600 text-white font-medium shadow-sm transition-all';
+          btnSecond.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-slate-200 transition-all';
+          this.chart.data.labels = this.pointLabels;
+          this.chart.options.scales.x.title.text = 'Cycle Point (0 - 249)';
+          this.chart.update('none');
+        });
+
+        btnSecond.addEventListener('click', () => {
+          this.displayMode = 'second';
+          btnSecond.className = 'px-3 py-1 rounded-md bg-gradient-to-r from-sky-600 to-blue-600 text-white font-medium shadow-sm transition-all';
+          btnPoint.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-slate-200 transition-all';
+          this.chart.data.labels = this.secondLabels;
+          this.chart.options.scales.x.title.text = 'Time (0 - 60s)';
+          this.chart.update('none');
+        });
+
+        // Toggle Wave Style (Continuous vs Sweep)
+        const btnWaveStyle = document.getElementById('btnToggleWaveStyle');
+        if (btnWaveStyle) {
+          btnWaveStyle.addEventListener('click', () => {
+            this.waveStyle = this.waveStyle === 'continuous' ? 'sweep' : 'continuous';
+            const label = document.getElementById('waveStyleLabel');
+            if (this.waveStyle === 'continuous') {
+              btnWaveStyle.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border border-sky-500/40 bg-sky-950/20 text-sky-300 hover:bg-sky-900/30 transition-colors';
+              label.innerText = 'Sóng: Liền Mạch';
+            } else {
+              btnWaveStyle.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border border-emerald-500/40 bg-emerald-950/20 text-emerald-300 hover:bg-emerald-900/30 transition-colors';
+              label.innerText = 'Sóng: Quét Đè';
+            }
+          });
+        }
+
+        // Toggle Despike
+        const btnDespike = document.getElementById('btnToggleDespike');
+        btnDespike.addEventListener('click', () => {
+          this.despikeEnabled = !this.despikeEnabled;
+          const label = document.getElementById('despikeLabel');
+          if (this.despikeEnabled) {
+            btnDespike.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border border-purple-500/40 bg-purple-950/20 text-purple-300 hover:bg-purple-900/30 transition-colors';
+            label.innerText = 'Despike: Bật';
+          } else {
+            btnDespike.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border border-slate-700 bg-slate-800/50 text-slate-400 hover:bg-slate-700/50 transition-colors';
+            label.innerText = 'Despike: Tắt (Raw)';
+          }
+        });
+
+        // Toggle Ghost Trace
+        const btnGhost = document.getElementById('btnToggleGhost');
+        btnGhost.addEventListener('click', () => {
+          this.ghostTraceEnabled = !this.ghostTraceEnabled;
+          const label = document.getElementById('ghostLabel');
+          this.chart.data.datasets[2].hidden = !this.ghostTraceEnabled;
+          if (this.ghostTraceEnabled) {
+            btnGhost.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-slate-700/50 transition-colors';
+            label.innerText = 'Ghost Trace: Bật';
+          } else {
+            btnGhost.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded text-xs border border-slate-800 bg-slate-900/50 text-slate-500 hover:bg-slate-800/50 transition-colors';
+            label.innerText = 'Ghost Trace: Tắt';
+          }
+          this.chart.update('none');
+        });
+
+        // Pause / Resume
+        const btnPause = document.getElementById('btnPauseResume');
+        btnPause.addEventListener('click', () => {
+          this.isPaused = !this.isPaused;
+          const text = document.getElementById('pauseText');
+          const icon = document.getElementById('pauseIcon');
+          if (this.isPaused) {
+            text.innerText = 'Tiếp Tục';
+            icon.setAttribute('data-lucide', 'play');
+            btnPause.classList.add('border-amber-500/50', 'text-amber-300', 'bg-amber-950/20');
+          } else {
+            text.innerText = 'Tạm Dừng';
+            icon.setAttribute('data-lucide', 'pause');
+            btnPause.classList.remove('border-amber-500/50', 'text-amber-300', 'bg-amber-950/20');
+          }
+          lucide.createIcons();
+        });
+
+        // Gas Channel change
+        const selectGas = document.getElementById('selectGasChannel');
+        selectGas.addEventListener('change', (e) => {
+          const gas = e.target.value;
+          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(JSON.stringify({ action: 'setAirType', airType: gas }));
+          }
+          document.getElementById('channelName').innerText = gas;
+        });
+
+        // Export Raw Data CSV
+        document.getElementById('btnExportCsv').addEventListener('click', () => {
+          this.exportRawCsv();
+        });
+
+        // Export Completed Cycles CSV
+        document.getElementById('btnDownloadCyclesCsv').addEventListener('click', () => {
+          this.exportCyclesCsv();
+        });
+
+        // Clear History
+        document.getElementById('btnClearHistory').addEventListener('click', () => {
+          this.completedCycles = [];
+          this.renderCycleHistory();
+        });
+      }
+
+      connectBackendWs() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/live_experiment`;
+
+        try {
+          this.ws = new WebSocket(wsUrl);
+
+          this.ws.onopen = () => {
+            this.updateConnectionStatus(true, 'RTDB Connected (FastAPI Gateway)');
+          };
+
+          this.ws.onmessage = (event) => {
+            if (this.isPaused) return;
+            try {
+              const data = JSON.parse(event.data);
+              if (data.type === 'telemetry') {
+                this.handleTelemetryPacket(data);
+              } else if (data.type === 'connected') {
+                this.updateConnectionStatus(true, 'RTDB Stream Live');
+              }
+            } catch (err) {
+              console.error('Error parsing WS message', err);
+            }
+          };
+
+          this.ws.onclose = () => {
+            this.updateConnectionStatus(false, 'Disconnected (Reconnecting in 2s...)');
+            this.retryConnect();
+          };
+
+          this.ws.onerror = () => {
+            this.updateConnectionStatus(false, 'Offline - Fallback Polling');
+            this.startFallbackPolling();
+          };
+        } catch (err) {
+          this.startFallbackPolling();
+        }
+      }
+
+      retryConnect() {
+        if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = setTimeout(() => {
+          this.connectBackendWs();
+        }, 2500);
+      }
+
+      startFallbackPolling() {
+        // Fallback directly to REST /api/firebase/latest if WebSocket fails
+        if (this.fallbackInterval) return;
+        this.fallbackInterval = setInterval(async () => {
+          if (this.isPaused) return;
+          try {
+            const resp = await fetch('/api/firebase/latest');
+            if (resp.ok) {
+              const json = await resp.json();
+              if (json.telemetry) {
+                this.handleTelemetryPacket({
+                  point: json.telemetry.point,
+                  voltage1: json.telemetry.voltage1,
+                  voltage2: json.telemetry.voltage2,
+                  telemetry: json.telemetry,
+                  inference: json.inference,
+                  timestamp: json.telemetry.timestamp
+                });
+                this.updateConnectionStatus(true, 'REST Live Stream active');
+              }
+            }
+          } catch (e) {
+            this.updateConnectionStatus(false, 'Connection Failed');
+          }
+        }, 220);
+      }
+
+      updateConnectionStatus(isConnected, message) {
+        const badge = document.getElementById('connectionBadge');
+        const text = document.getElementById('connectionText');
+        if (!badge || !text) return;
+
+        if (isConnected) {
+          badge.className = 'flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-xs font-mono';
+          badge.innerHTML = `
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span id="connectionText">${message}</span>
+          `;
+        } else {
+          badge.className = 'flex items-center gap-2 px-3 py-1 rounded-full bg-rose-950/40 border border-rose-500/30 text-rose-400 text-xs font-mono';
+          badge.innerHTML = `
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+            <span id="connectionText">${message}</span>
+          `;
+        }
+      }
+
+      // Hardware despike algorithm matching clean_sensor_data.py
+      applyDespike(point, v1) {
+        // If despike is disabled, return raw
+        if (!this.despikeEnabled) return v1;
+        
+        // Spike region typically occurs around points 124 - 134
+        if (point >= 125 && point <= 135) {
+          const preVal = this.v1Points[124] || v1;
+          // Smooth decay interpolation back to baseline
+          const factor = (point - 124) / 11;
+          const postTarget = preVal * 0.98;
+          return preVal * (1 - factor) + postTarget * factor;
+        }
+        return v1;
+      }
+
+      handleTelemetryPacket(packet) {
+        const pt = parseInt(packet.point ?? 0);
+        let v1 = parseFloat(packet.voltage1 ?? 0.0);
+        const v2 = parseFloat(packet.voltage2 ?? 0.0);
+        const telemetry = packet.telemetry || packet;
+        const inference = packet.inference || {};
+
+        // Apply real-time hardware despike if enabled
+        v1 = this.applyDespike(pt, v1);
+
+        // Record packet for CSV export
+        this.recordedPackets.push({
+          cycle: this.currentCycle,
+          point: pt,
+          voltage1: v1,
+          voltage2: v2,
+          sensor1: telemetry.sensor1 || telemetry.rawSensor1 || 0,
+          sensor2: telemetry.sensor2 || telemetry.rawSensor2 || 0,
+          gas: inference.gas || 'Clean Air',
+          ppm: inference.estimatedppm || 0.0,
+          timestamp: packet.timestamp || new Date().toISOString()
+        });
+
+        // Limit in-memory buffer to last 15,000 packets (~1 hour of continuous testing)
+        if (this.recordedPackets.length > 15000) {
+          this.recordedPackets.shift();
+        }
+
+        // ==========================================================
+        // SEAMLESS CYCLE & SMART INTERPOLATION LOGIC
+        // ==========================================================
+        // Detect cycle completion: point wrapped around (e.g. from >180 back to <30) or point == 0
+        if ((this.lastPoint >= 180 && pt < 30) || (this.lastPoint > pt && pt === 0)) {
+          this.onCycleComplete();
+          this.currentCycle += 1;
+          this.cycleStartTime = new Date();
+          this.cycleMaxV1 = v1;
+          this.cycleMinV1 = v1;
+          this.cyclePeakPoint = pt;
+          this.lastPoint = -1;
+        }
+
+        // Track peak/min for current cycle
+        if (v1 > this.cycleMaxV1) {
+          this.cycleMaxV1 = v1;
+          this.cyclePeakPoint = pt;
+        }
+        if (v1 < this.cycleMinV1) {
+          this.cycleMinV1 = v1;
+        }
+
+        // Write values with Linear Interpolation for any missing intermediate points
+        if (pt >= 0 && pt < 250) {
+          if (this.lastPoint >= 0 && pt > this.lastPoint && (pt - this.lastPoint) > 1 && (pt - this.lastPoint) <= 25) {
+            const steps = pt - this.lastPoint;
+            const prevV1 = this.v1Points[this.lastPoint] ?? v1;
+            const prevV2 = this.v2Points[this.lastPoint] ?? v2;
+            for (let i = 1; i < steps; i++) {
+              const interIdx = this.lastPoint + i;
+              const ratio = i / steps;
+              this.v1Points[interIdx] = prevV1 + (v1 - prevV1) * ratio;
+              this.v2Points[interIdx] = prevV2 + (v2 - prevV2) * ratio;
+            }
+          }
+
+          this.v1Points[pt] = v1;
+          this.v2Points[pt] = v2;
+
+          // In sweep overwrite mode: clear small cursor window ahead to erase old sweep
+          if (this.waveStyle === 'sweep') {
+            const gapSize = 4;
+            for (let i = 1; i <= gapSize; i++) {
+              const clearIdx = (pt + i) % 250;
+              this.v1Points[clearIdx] = null;
+              this.v2Points[clearIdx] = null;
+            }
+          }
+        }
+
+        this.lastPoint = pt;
+
+        // Update Chart
+        this.chart.update('none');
+
+        // Update UI Cards
+        this.updateUiTelemetry(pt, v1, v2, telemetry, inference);
+      }
+
+      onCycleComplete() {
+        // Archive current cycle into ghost trace for comparison
+        this.ghostV1Points = [...this.v1Points];
+        this.chart.data.datasets[2].data = this.ghostV1Points;
+
+        // Calculate cycle metrics
+        const validV1 = this.v1Points.filter(p => p !== null && !isNaN(p));
+        const deltaV = validV1.length > 0 ? (this.cycleMaxV1 - this.cycleMinV1) : 0.0;
+        const auc = validV1.reduce((a, b) => a + b, 0);
+        
+        // Log cycle history
+        const cycleRecord = {
+          cycleNum: this.currentCycle,
+          timestamp: this.cycleStartTime.toLocaleTimeString('en-US'),
+          gas: document.getElementById('predictedGasName')?.innerText || 'Clean Air',
+          ppm: document.getElementById('kpiPpmVal')?.innerText?.replace('ppm', '').trim() || '0.0',
+          maxV1: this.cycleMaxV1.toFixed(3),
+          minV1: this.cycleMinV1.toFixed(3),
+          deltaV: deltaV.toFixed(3),
+          auc: auc.toFixed(1),
+          peakPoint: this.cyclePeakPoint,
+          risk: document.getElementById('riskBadge')?.innerText || 'Normal'
+        };
+
+        this.completedCycles.unshift(cycleRecord);
+        if (this.completedCycles.length > 50) this.completedCycles.pop();
+        this.renderCycleHistory();
+
+        // In continuous mode, reset the active line so it draws a clean new wave from 0 to 249
+        if (this.waveStyle === 'continuous') {
+          this.v1Points = new Array(250).fill(null);
+          this.v2Points = new Array(250).fill(null);
+          this.chart.data.datasets[0].data = this.v1Points;
+          this.chart.data.datasets[1].data = this.v2Points;
+        }
+
+        // If cycleSummary was provided by backend model, log it
+        console.log(`WaveCycle #${this.currentCycle} completed. Max V1: ${this.cycleMaxV1.toFixed(3)}V at Point ${this.cyclePeakPoint}`);
+      }
+
+      updateUiTelemetry(pt, v1, v2, telemetry, inference) {
+        // 1. Titles & Badges
+        const titleEl = document.getElementById('waveCycleTitle');
+        const pointNumEl = document.getElementById('currentPointNum');
+        const telemetryGasTitle = document.getElementById('telemetryGasTitle');
+        const telemetryStatus = document.getElementById('telemetryStatus');
+        
+        if (titleEl) {
+          titleEl.innerHTML = `WaveCycle #${this.currentCycle} &bull; <span id="telemetryGasTitle" class="${this.getGasColorClass(inference.gas)}">${inference.gas || 'Clean Air'}</span>`;
+        }
+        if (pointNumEl) pointNumEl.innerText = pt;
+        if (telemetryStatus) {
+          telemetryStatus.innerText = inference.gas || 'Clean Air';
+          telemetryStatus.className = `${this.getGasColorClass(inference.gas)} font-semibold`;
+        }
+
+        // Progress bar
+        const progressPct = ((pt / 249) * 100).toFixed(0);
+        const barEl = document.getElementById('cycleProgressBar');
+        const pctEl = document.getElementById('cycleProgressPercent');
+        if (barEl) barEl.style.width = `${progressPct}%`;
+        if (pctEl) pctEl.innerText = `${progressPct}%`;
+
+        // 2. AI Inference Cards
+        const gasNameEl = document.getElementById('predictedGasName');
+        const confEl = document.getElementById('predictedConfidence');
+        const ppmEl = document.getElementById('kpiPpmVal');
+        const riskBadge = document.getElementById('riskBadge');
+        const latencyBadge = document.getElementById('aiLatencyBadge');
+
+        if (gasNameEl) {
+          gasNameEl.innerText = inference.gas || 'Clean Air';
+          gasNameEl.className = `text-2xl sm:text-3xl font-extrabold tracking-tight mt-1 ${this.getGasColorClass(inference.gas)}`;
+        }
+        if (confEl) {
+          confEl.innerText = `${inference.confidence ?? 98}%`;
+        }
+        if (ppmEl) {
+          const ppm = inference.estimatedppm !== undefined ? inference.estimatedppm.toFixed(1) : '0.0';
+          ppmEl.innerHTML = `${ppm} <span class="text-xs font-normal text-slate-400">ppm</span>`;
+        }
+        if (latencyBadge && inference.latencyMs) {
+          latencyBadge.innerText = `~${inference.latencyMs} ms`;
+        }
+
+        // Probabilities
+        if (inference.probabilities) {
+          const pAir = ((inference.probabilities['Clean Air'] || 0) * 100).toFixed(1);
+          const pH2S = ((inference.probabilities['H2S'] || 0) * 100).toFixed(1);
+          const pNH3 = ((inference.probabilities['NH3'] || 0) * 100).toFixed(1);
+
+          document.getElementById('probCleanAir').innerText = `${pAir}%`;
+          document.getElementById('barProbCleanAir').style.width = `${pAir}%`;
+
+          document.getElementById('probH2S').innerText = `${pH2S}%`;
+          document.getElementById('barProbH2S').style.width = `${pH2S}%`;
+
+          document.getElementById('probNH3').innerText = `${pNH3}%`;
+          document.getElementById('barProbNH3').style.width = `${pNH3}%`;
+        }
+
+        // Risk Level
+        if (riskBadge && inference.riskLevel) {
+          riskBadge.innerText = inference.riskLevel;
+          if (inference.riskLevel === 'Emergency') {
+            riskBadge.className = 'px-2.5 py-0.5 rounded text-xs font-semibold bg-rose-950/70 border border-rose-500 text-rose-300 font-mono animate-pulse';
+          } else if (inference.riskLevel === 'Hazardous') {
+            riskBadge.className = 'px-2.5 py-0.5 rounded text-xs font-semibold bg-orange-950/60 border border-orange-500 text-orange-300 font-mono';
+          } else if (inference.riskLevel === 'Warning') {
+            riskBadge.className = 'px-2.5 py-0.5 rounded text-xs font-semibold bg-amber-950/60 border border-amber-500 text-amber-300 font-mono';
+          } else {
+            riskBadge.className = 'px-2.5 py-0.5 rounded text-xs font-semibold bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 font-mono';
+          }
+        }
+
+        // Peak & Min KPIs
+        document.getElementById('kpiPeakV1').innerHTML = `${this.cycleMaxV1.toFixed(3)} <span class="text-xs font-normal text-slate-400">V</span>`;
+        document.getElementById('kpiPeakPoint').innerText = this.cyclePeakPoint;
+
+        // Sliding window features
+        this.recentWindow.push(v1);
+        if (this.recentWindow.length > 20) this.recentWindow.shift();
+
+        if (this.recentWindow.length >= 2) {
+          const mean = (this.recentWindow.reduce((a, b) => a + b, 0) / this.recentWindow.length).toFixed(3);
+          const variance = this.recentWindow.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / this.recentWindow.length;
+          const std = Math.sqrt(variance).toFixed(3);
+          const delta = (this.recentWindow[this.recentWindow.length - 1] - this.recentWindow[0]).toFixed(3);
+          const slope = (delta / this.recentWindow.length).toFixed(4);
+
+          document.getElementById('featMean').innerText = `${mean} V`;
+          document.getElementById('featStd').innerText = `${std} V`;
+          document.getElementById('featSlope').innerText = `${slope >= 0 ? '+' : ''}${slope}/s`;
+        }
+
+        // Hardware Telemetry Readouts
+        document.getElementById('telemetryV1').innerText = `${v1.toFixed(5)} V`;
+        document.getElementById('telemetryV2').innerText = `${v2.toFixed(5)} V`;
+        document.getElementById('telemetrySensor1').innerText = telemetry.sensor1 || telemetry.rawSensor1 || 0;
+        document.getElementById('telemetrySensor2').innerText = telemetry.sensor2 || telemetry.rawSensor2 || 0;
+        document.getElementById('telemetryDac').innerText = (telemetry.dacVoltage || telemetry.dac_voltage || 0).toFixed(1);
+        document.getElementById('telemetryPulse').innerText = telemetry.pulse || 0;
+      }
+
+      getGasColorClass(gas) {
+        if (gas === 'H2S') return 'text-rose-400';
+        if (gas === 'NH3') return 'text-indigo-400';
+        return 'text-emerald-400';
+      }
+
+      renderCycleHistory() {
+        const tbody = document.getElementById('cycleHistoryTableBody');
+        const countEl = document.getElementById('completedCyclesCount');
+        if (!tbody) return;
+
+        countEl.innerText = `${this.completedCycles.length} chu kỳ`;
+
+        if (this.completedCycles.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="9" class="py-6 text-center text-slate-500 italic">
+                Chưa có chu kỳ nào được lưu.
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        tbody.innerHTML = this.completedCycles.map((c) => {
+          let riskColor = 'text-emerald-400';
+          if (c.risk === 'Emergency') riskColor = 'text-rose-400 font-bold';
+          else if (c.risk === 'Hazardous') riskColor = 'text-orange-400';
+          else if (c.risk === 'Warning') riskColor = 'text-amber-400';
+
+          return `
+            <tr class="hover:bg-slate-800/30 transition-colors">
+              <td class="py-2.5 px-3 font-bold text-sky-400">#${c.cycleNum}</td>
+              <td class="py-2.5 px-3 text-slate-400">${c.timestamp}</td>
+              <td class="py-2.5 px-3 ${this.getGasColorClass(c.gas)} font-semibold">${c.gas}</td>
+              <td class="py-2.5 px-3 font-bold text-white">${c.ppm} ppm</td>
+              <td class="py-2.5 px-3 text-cyan-300">${c.maxV1}V <span class="text-[10px] text-slate-500">(@${c.peakPoint})</span></td>
+              <td class="py-2.5 px-3 text-slate-400">${c.minV1}V</td>
+              <td class="py-2.5 px-3 text-amber-300">+${c.deltaV}V</td>
+              <td class="py-2.5 px-3 text-slate-300">${c.auc}</td>
+              <td class="py-2.5 px-3 ${riskColor}">${c.risk}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      exportRawCsv() {
+        if (this.recordedPackets.length === 0) {
+          alert('Chưa có dữ liệu để xuất CSV!');
+          return;
+        }
+        const headers = ['Cycle', 'Point', 'Voltage1_MQ135', 'Voltage2_MQ136', 'RawSensor1', 'RawSensor2', 'IdentifiedGas', 'EstimatedPPM', 'Timestamp'];
+        const rows = this.recordedPackets.map(p => [
+          p.cycle,
+          p.point,
+          p.voltage1,
+          p.voltage2,
+          p.sensor1,
+          p.sensor2,
+          `"${p.gas}"`,
+          p.ppm,
+          `"${p.timestamp}"`
+        ]);
+
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `enose_telemetry_stream_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      exportCyclesCsv() {
+        if (this.completedCycles.length === 0) {
+          alert('Chưa có chu kỳ nào hoàn thành để xuất báo cáo!');
+          return;
+        }
+        const headers = ['CycleID', 'Timestamp', 'IdentifiedGas', 'EstimatedPPM', 'MaxVoltage1', 'MinVoltage1', 'DeltaV', 'AUC', 'PeakPoint', 'RiskLevel'];
+        const rows = this.completedCycles.map(c => [
+          c.cycleNum,
+          `"${c.timestamp}"`,
+          `"${c.gas}"`,
+          c.ppm,
+          c.maxV1,
+          c.minV1,
+          c.deltaV,
+          c.auc,
+          c.peakPoint,
+          `"${c.risk}"`
+        ]);
+
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `enose_wavecycles_report_${new Date().toISOString().replace(/[:.]/g, '-')}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const app = new ExperimentApp();
+      app.init();
+    });
+  </script>
+</body>
+</html>
