@@ -220,27 +220,27 @@
         </div>
       </div>
       <div
-        class="col-span-1 lg:col-span-4 rounded border border-slate-800 bg-slate-900/50 flex flex-col overflow-hidden">
+        class="col-span-1 lg:col-span-7 rounded border border-slate-800 bg-slate-900/50 flex flex-col overflow-hidden">
         <div class="flex items-center justify-between px-3 py-2.5 border-b border-slate-800 bg-slate-900/80">
-          <h3 class="text-xs text-slate-200 flex items-center gap-1.5"><i data-lucide="activity"
-              class="w-4 h-4 text-amber-400"></i> Sensor MQ136 &amp; Horizon</h3>
-          <span class="text-[9px] text-amber-400 font-mono tracking-wider bg-amber-400/10 px-1.5 py-0.5 rounded">+20s
-            Projection</span>
+          <div class="flex items-center gap-2">
+            <h3 class="text-xs text-slate-200 flex items-center gap-1.5"><i data-lucide="waves"
+                class="w-4 h-4 text-cyan-400"></i> WaveCycle Oscilloscope (250 Points / 60s)</h3>
+            <span id="waveCycleNumBadge" class="text-[10px] text-cyan-400 font-mono tracking-wider bg-cyan-400/10 px-2 py-0.5 rounded border border-cyan-500/20">Cycle #1</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="wavePointBadge" class="text-[10px] text-slate-300 font-mono bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">Point: <strong id="waveCurrentPoint" class="text-cyan-300">0</strong>/249 (<span id="waveCurrentSec">0.0s</span>)</span>
+            <span class="text-[9px] text-emerald-400 font-mono tracking-wider bg-emerald-400/10 px-1.5 py-0.5 rounded border border-emerald-500/20">Sweep Overwrite</span>
+          </div>
         </div>
         <div class="p-3 flex-1 relative min-h-[220px]">
-          <canvas id="lineTrendChart"></canvas>
+          <canvas id="waveCycleChart"></canvas>
         </div>
-      </div>
-      <div
-        class="col-span-1 lg:col-span-3 rounded border border-slate-800 bg-slate-900/50 flex flex-col overflow-hidden">
-        <div class="flex items-center justify-between px-3 py-2.5 border-b border-slate-800 bg-slate-900/80">
-          <h3 class="text-xs text-slate-200 flex items-center gap-1.5"><i data-lucide="trending-up"
-              class="w-4 h-4 text-emerald-400"></i> Velocity &amp; Span</h3>
-          <span
-            class="text-[9px] text-emerald-400 font-mono tracking-wider bg-emerald-400/10 px-1.5 py-0.5 rounded">Kinetics</span>
-        </div>
-        <div class="p-3 flex-1 relative min-h-[220px]">
-          <canvas id="areaNetworkChart"></canvas>
+        <div class="px-3 pb-2 pt-0 flex items-center gap-2">
+          <span class="text-[9px] font-mono text-slate-500 whitespace-nowrap">Tiến trình chu kỳ:</span>
+          <div class="flex-1 h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
+            <div id="waveCycleProgressBar" class="h-full bg-gradient-to-r from-cyan-500 via-sky-400 to-emerald-400 transition-all duration-150" style="width: 0%;"></div>
+          </div>
+          <span id="waveCycleProgressPct" class="text-[10px] font-mono text-cyan-400 w-9 text-right">0%</span>
         </div>
       </div>
       <div
@@ -563,18 +563,27 @@
 
     class ChartManager {
       constructor() {
-        this.barGasProbChart = null; this.lineS3WaveformChart = null;
-        this.areaKineticChart = null; this.donutGasRatioChart = null;
-        this.gaugeConfidenceChart = null; this.serverLoadChart = null;
-        this.timeLabels = []; this.maxPoints = 16;
+        this.barGasProbChart = null;
+        this.waveCycleChart = null;
+        this.donutGasRatioChart = null;
+        this.gaugeConfidenceChart = null;
+        this.serverLoadChart = null;
+        this.currentCycleCount = 1;
+        this.lastPoint = null;
+        this.pointLabels = Array.from({ length: 250 }, (_, i) => i);
+        this.activeCyclePoints = new Array(250).fill(null);
+        this.ghostPoints = new Array(250).fill(null);
+        this.rawCyclePoints = new Array(250).fill(null);
         this.latencyHistory = [];
         Chart.defaults.color = '#64748b';
         Chart.defaults.font.family = 'Inter, sans-serif';
         Chart.defaults.scale.grid.color = '#1e293b';
       }
       init() {
-        this.initBarChart(); this.initLineWaveformChart();
-        this.initAreaKineticChart(); this.initDonutChart(); this.initGaugeChart();
+        this.initBarChart();
+        this.initWaveCycleChart();
+        this.initDonutChart();
+        this.initGaugeChart();
         this.initServerLoadChart();
       }
       initBarChart() {
@@ -601,48 +610,103 @@
           }
         });
       }
-      initLineWaveformChart() {
-        const ctx = document.getElementById('lineTrendChart').getContext('2d');
-        this.lineS3WaveformChart = new Chart(ctx, {
+      initWaveCycleChart() {
+        const ctx = document.getElementById('waveCycleChart').getContext('2d');
+        this.waveCycleChart = new Chart(ctx, {
           type: 'line',
           data: {
-            labels: [],
+            labels: this.pointLabels,
             datasets: [
-              { label: 'MQ136 Signal (V)', data: [], borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.1)', borderWidth: 2, pointRadius: 2, fill: true },
-              { label: 'Window Mean (V)', data: [], borderColor: '#c026d3', borderWidth: 1, borderDash: [3, 3], pointRadius: 0, fill: false },
-              { label: 'Projected - +20s (V)', data: [], borderColor: '#f97316', borderWidth: 2, borderDash: [4, 4], pointRadius: 3, pointBackgroundColor: '#f97316', fill: false }
+              {
+                label: 'Chu kỳ trước (Ghost Trace)',
+                data: this.ghostPoints,
+                borderColor: 'rgba(148, 163, 184, 0.35)',
+                borderWidth: 1.5,
+                borderDash: [4, 4],
+                pointRadius: 0,
+                tension: 0.2,
+                fill: false,
+                spanGaps: true
+              },
+              {
+                label: 'MQ136 Signal (V)',
+                data: this.activeCyclePoints,
+                borderColor: '#38bdf8',
+                backgroundColor: 'rgba(56, 189, 248, 0.08)',
+                borderWidth: 2.2,
+                pointRadius: (ctx) => {
+                  return ctx.dataIndex === this.lastPoint ? 5 : 0;
+                },
+                pointBackgroundColor: '#ffffff',
+                pointBorderColor: '#38bdf8',
+                pointBorderWidth: 2,
+                tension: 0.2,
+                fill: true,
+                spanGaps: false
+              },
+              {
+                label: 'Raw S3 (V)',
+                data: this.rawCyclePoints,
+                borderColor: 'rgba(245, 158, 11, 0.5)',
+                borderWidth: 1.2,
+                borderDash: [2, 2],
+                pointRadius: 0,
+                tension: 0.1,
+                fill: false,
+                spanGaps: false
+              }
             ]
           },
           options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: {
+              intersect: false,
+              mode: 'index'
+            },
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { boxWidth: 10, font: { size: 10 }, color: '#94a3b8' }
+              },
+              tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                titleColor: '#38bdf8',
+                bodyColor: '#f1f5f9',
+                borderColor: '#334155',
+                borderWidth: 1,
+                padding: 8,
+                callbacks: {
+                  title: (items) => {
+                    const idx = items[0].dataIndex;
+                    const sec = ((idx / 249) * 60).toFixed(1);
+                    return `Point ${idx}/249 (${sec}s)`;
+                  }
+                }
+              }
+            },
             scales: {
               y: {
                 title: { display: true, text: 'Voltage (V)', color: '#94a3b8', font: { size: 10 } },
                 suggestedMin: 0.0,
                 suggestedMax: 3.5,
-                ticks: { font: { size: 10 } }
+                ticks: { font: { size: 10 }, color: '#64748b' },
+                grid: { color: 'rgba(30, 41, 59, 0.7)' }
               },
-              x: { ticks: { font: { size: 10 } } }
+              x: {
+                title: { display: true, text: 'Cycle Point (0 - 249) • 60s WaveCycle', color: '#94a3b8', font: { size: 10 } },
+                grid: { color: 'rgba(30, 41, 59, 0.5)' },
+                ticks: {
+                  font: { size: 10 },
+                  color: '#64748b',
+                  callback: (val, idx) => {
+                    return idx % 25 === 0 ? idx : null;
+                  },
+                  autoSkip: false
+                }
+              }
             }
-          }
-        });
-      }
-      initAreaKineticChart() {
-        const ctx = document.getElementById('areaNetworkChart').getContext('2d');
-        this.areaKineticChart = new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: [],
-            datasets: [
-              { label: 'Window Span - Range', data: [], borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.15)', borderWidth: 1.5, fill: true, tension: 0.3, pointRadius: 1 },
-              { label: 'Velocity - Slopex100', data: [], borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', borderWidth: 1.5, fill: true, tension: 0.3, pointRadius: 1 }
-            ]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
-            scales: { y: { suggestedMin: -0.05, suggestedMax: 0.30, ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } }
           }
         });
       }
@@ -714,34 +778,62 @@
           this.barGasProbChart.update();
         }
 
-        // Update S3 waveform line chart
-        if (this.lineS3WaveformChart) {
-          if (this.timeLabels.length >= this.maxPoints) {
-            this.timeLabels.shift(); this.lineS3WaveformChart.data.datasets.forEach(d => d.data.shift());
-          }
-          this.timeLabels.push(timestamp);
-          this.lineS3WaveformChart.data.labels = this.timeLabels;
-          this.lineS3WaveformChart.data.datasets[0].data.push(s3);
-          this.lineS3WaveformChart.data.datasets[1].data.push(features ? features.mean : s3);
-          this.lineS3WaveformChart.data.datasets[2].data.push((prognostics && prognostics.trajectoryPoints) ? prognostics.trajectoryPoints[3] : s3);
-          let strokeColor = '#38bdf8', bgColor = 'rgba(56,189,248,0.1)';
-          if (riskLevel === 'Emergency' || (prognostics && prognostics.isImminentEmergency)) { strokeColor = '#ef4444'; bgColor = 'rgba(239,68,68,0.1)'; }
-          else if (riskLevel === 'Hazardous') { strokeColor = '#f97316'; bgColor = 'rgba(249,115,22,0.1)'; }
-          else if (riskLevel === 'Warning') { strokeColor = '#f59e0b'; bgColor = 'rgba(245,158,11,0.1)'; }
-          this.lineS3WaveformChart.data.datasets[0].borderColor = strokeColor;
-          this.lineS3WaveformChart.data.datasets[0].backgroundColor = bgColor;
-          this.lineS3WaveformChart.update();
-        }
+        // Update WaveCycle Oscilloscope Chart (Sweep Overwrite)
+        if (this.waveCycleChart) {
+          const pt = (modelResult.frameIndex !== undefined)
+            ? (modelResult.frameIndex % 250)
+            : ((this.lastPoint === null ? 0 : this.lastPoint + 1) % 250);
 
-        // Update kinetics area chart
-        if (this.areaKineticChart && features) {
-          if (this.areaKineticChart.data.labels.length >= this.maxPoints) {
-            this.areaKineticChart.data.labels.shift(); this.areaKineticChart.data.datasets.forEach(d => d.data.shift());
+          // Cycle wrap-around detection: archive previous cycle to ghost trace
+          if (this.lastPoint !== null && (pt < this.lastPoint || (this.lastPoint >= 240 && pt < 20))) {
+            this.ghostPoints = [...this.activeCyclePoints];
+            this.waveCycleChart.data.datasets[0].data = this.ghostPoints;
+            this.currentCycleCount++;
+            const cycleBadge = document.getElementById('waveCycleNumBadge');
+            if (cycleBadge) cycleBadge.innerText = `Cycle #${this.currentCycleCount}`;
           }
-          this.areaKineticChart.data.labels.push(timestamp);
-          this.areaKineticChart.data.datasets[0].data.push(features.range);
-          this.areaKineticChart.data.datasets[1].data.push(features.slope * 100);
-          this.areaKineticChart.update();
+
+          // Sweep overwrite: record current point
+          this.activeCyclePoints[pt] = s3;
+          if (modelResult.s3Raw !== undefined) {
+            this.rawCyclePoints[pt] = modelResult.s3Raw;
+          }
+
+          // Sweep cursor gap ahead: clear 5 points ahead to erase old sweep data
+          const gapSize = 5;
+          for (let i = 1; i <= gapSize; i++) {
+            const clearIdx = (pt + i) % 250;
+            this.activeCyclePoints[clearIdx] = null;
+            this.rawCyclePoints[clearIdx] = null;
+          }
+
+          this.lastPoint = pt;
+
+          // Dynamic stroke color based on risk level
+          let strokeColor = '#38bdf8', bgColor = 'rgba(56, 189, 248, 0.08)';
+          if (riskLevel === 'Emergency' || (prognostics && prognostics.isImminentEmergency)) {
+            strokeColor = '#ef4444'; bgColor = 'rgba(239, 68, 68, 0.12)';
+          } else if (riskLevel === 'Hazardous') {
+            strokeColor = '#f97316'; bgColor = 'rgba(249, 115, 22, 0.10)';
+          } else if (riskLevel === 'Warning') {
+            strokeColor = '#f59e0b'; bgColor = 'rgba(245, 158, 11, 0.10)';
+          }
+
+          this.waveCycleChart.data.datasets[1].borderColor = strokeColor;
+          this.waveCycleChart.data.datasets[1].backgroundColor = bgColor;
+          this.waveCycleChart.data.datasets[1].pointBorderColor = strokeColor;
+          this.waveCycleChart.update('none');
+
+          // Update point badge & progress bar
+          const ptEl = document.getElementById('waveCurrentPoint');
+          if (ptEl) ptEl.innerText = pt;
+          const secEl = document.getElementById('waveCurrentSec');
+          if (secEl) secEl.innerText = `${((pt / 249) * 60).toFixed(1)}s`;
+          const progBar = document.getElementById('waveCycleProgressBar');
+          const progPct = document.getElementById('waveCycleProgressPct');
+          const pctVal = Math.round((pt / 249) * 100);
+          if (progBar) progBar.style.width = `${pctVal}%`;
+          if (progPct) progPct.innerText = `${pctVal}%`;
         }
 
         // Update donut classification chart
@@ -780,18 +872,26 @@
         }
       }
       resetHistory() {
-        this.timeLabels = [];
+        this.activeCyclePoints = new Array(250).fill(null);
+        this.rawCyclePoints = new Array(250).fill(null);
+        this.lastPoint = null;
+        this.currentCycleCount = 1;
+        if (this.waveCycleChart) {
+          this.waveCycleChart.data.datasets[1].data = this.activeCyclePoints;
+          this.waveCycleChart.data.datasets[2].data = this.rawCyclePoints;
+          this.waveCycleChart.update('none');
+        }
+        const cycleBadge = document.getElementById('waveCycleNumBadge');
+        if (cycleBadge) cycleBadge.innerText = `Cycle #1`;
+        const ptEl = document.getElementById('waveCurrentPoint');
+        if (ptEl) ptEl.innerText = '0';
+        const secEl = document.getElementById('waveCurrentSec');
+        if (secEl) secEl.innerText = '0.0s';
+        const progBar = document.getElementById('waveCycleProgressBar');
+        if (progBar) progBar.style.width = '0%';
+        const progPct = document.getElementById('waveCycleProgressPct');
+        if (progPct) progPct.innerText = '0%';
         this.latencyHistory = [];
-        if (this.lineS3WaveformChart) {
-          this.lineS3WaveformChart.data.labels = [];
-          this.lineS3WaveformChart.data.datasets.forEach(d => d.data = []);
-          this.lineS3WaveformChart.update();
-        }
-        if (this.areaKineticChart) {
-          this.areaKineticChart.data.labels = [];
-          this.areaKineticChart.data.datasets.forEach(d => d.data = []);
-          this.areaKineticChart.update();
-        }
         if (this.serverLoadChart) {
           this.serverLoadChart.data.labels = [];
           this.serverLoadChart.data.datasets[0].data = [];
