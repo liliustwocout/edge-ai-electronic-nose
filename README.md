@@ -15,9 +15,9 @@
 Khí Độc H2S & NH3 Xuất Hiện Tại Các Mỏ Khí & Nhà Máy Lọc Hóa Dầu  
 Đầu Báo Khí Cố Định Truyền Thống Thường Báo Động Muộn & Gây Báo Động Giả  
 Hệ Thống E-Nose Kết Hợp Edge AI Xây Dựng Gas Fingerprint Của H2S & NH3  
-Cảnh Báo Sớm Nguy Cơ Rò Rỉ Theo Động Học Time-Series  
+Cảnh Báo Sớm Nguy Cơ Rò Rỉ Theo Động Học Time-Series & Chu Kỳ Sóng WaveCycle  
 Phân Cấp An Toàn 4 Cấp Độ: Normal, Warning, Hazardous, Emergency  
-Truyền Thông Chống Nhiễu RS-485 Modbus RTU & Đồng Bộ WISE-IoT Cloud Qua MQTT  
+Truyền Thông Chống Nhiễu RS-485 Modbus RTU & Đồng Bộ Firebase Realtime DB / WISE-IoT Cloud  
 
 ---
 
@@ -38,7 +38,7 @@ Truyền Thông Chống Nhiễu RS-485 Modbus RTU & Đồng Bộ WISE-IoT Cloud 
 
 ### Pulse-Level Model (Offline / High Accuracy)
 
-Phân tích toàn bộ 250 điểm dữ liệu trong 60 giây mỗi pulse.
+Phân tích toàn bộ 250 điểm dữ liệu trong 60 giây mỗi pulse (WaveCycle).
 
 | Metric | Value |
 |--------|-------|
@@ -66,26 +66,27 @@ Trích xuất feature từ sliding window 20 bước thời gian cho inference l
 
 ### Top Feature Importance (RandomForest)
 
-| Feature | Importance |
-|---------|-----------|
-| Std_V (Biến thiên tín hiệu) | 13.04% |
-| Decay_Slope (Tốc độ suy giảm) | 11.70% |
-| Rise_Slope (Tốc độ tăng) | 10.58% |
-| Delta_V (Biên độ tín hiệu) | 9.43% |
-| Peak_Time (Thời điểm đỉnh) | 7.52% |
+| Feature | Importance | Ý Nghĩa Vật Lý |
+|---------|-----------|----------------|
+| **Std_V** | 13.04% | Biến thiên tín hiệu trong chu kỳ |
+| **Decay_Slope** | 11.70% | Tốc độ suy giảm sau khi xả khí |
+| **Rise_Slope** | 10.58% | Tốc độ tăng điện áp khi tiếp xúc khí |
+| **Delta_V** | 9.43% | Biên độ chênh lệch ($V_{max} - V_{min}$) |
+| **Peak_Time** | 7.52% | Thời điểm đạt đỉnh đáp ứng |
+| **Min_V** | 6.05% | Mức điện áp nền của cảm biến |
 
 ---
 
 ## 5-Layer System Architecture
 
 ```
-Application Layer: Web Dashboard - Operations Center (Dark Mode Industrial UI)
+Application Layer: Web Dashboard (Operations Center & Live WaveCycle Oscilloscope)
            ▲
-           │ Internet MQTT / HTTPS
+           │ Internet WebSocket / Firebase RTDB / HTTPS
            ▼
-Cloud Platform Layer: Advantech WISE-IoT Platform - Historical Storage, Analytics, Alarms
+Cloud Platform Layer: Advantech WISE-IoT Platform & Firebase Realtime Database
            ▲
-           │ Internet MQTT Via Ethernet / Wi-Fi
+           │ Internet MQTT / SSE Stream Via Ethernet / Wi-Fi
            ▼
 Edge AI Layer: Raspberry Pi 5 Gateway - Modbus Master, Filtering, RandomForest AI
            ▲
@@ -95,7 +96,7 @@ Communication Layer: Daisy-Chain Bus: Node 1 ─── Node 2 ─── Node 3 �
            ▲
            │
            ▼
-Perception Layer: ESP32 Nodes + ZE03-H2S / MQ136, MQ135, DHT22 + IP65 Enclosure + 12V Power
+Perception Layer: ESP32 Nodes + Sensor Array (MQ136 / ZE03-H2S, MQ135, DHT22)
 ```
 
 ---
@@ -108,32 +109,33 @@ Closed-Loop Operating Process Từ Hiện Trường Đến Operator:
 Gas Leakage Tại Hiện Trường (H2S / NH3)
            │
            ▼
-Node ESP32 Sampling ADC & Nhiệt Ẩm (250 samples / 60s per pulse)
+Node ESP32 Sampling ADC & Nhiệt Ẩm (250 samples / 60s per WaveCycle)
            │
            ▼
-Modbus RTU Slave Đóng Gói Khung Truyền Qua RS-485
+Modbus RTU Slave Đóng Gói Khung Truyền Qua RS-485 / Firebase RTDB
            │
            ▼
-Raspberry Pi 5 Gateway Modbus Master Thu Thập Dữ Liệu
+Raspberry Pi 5 Gateway Thu Thập Dữ Liệu
            │
-           ├── Lọc Số EMA Filter (α=0.2) & Bù Drift Nhiệt Ẩm
-           ├── Trích Xuất Time-Series Feature Vector (20 statistical + anchor features)
+           ├── Lọc Số EMA Filter (α=0.2) & Khử Gai Hardware Despike
+           ├── Bù Drift Nhiệt Ẩm (compFactor theo DHT22)
+           ├── Trích Xuất Time-Series Feature Vector (Sliding Window & Full Pulse)
            └── Chạy Edge AI RandomForest Model Nhận Dạng Gas Pattern & Classify Risk
            │
            ▼
 Fail-Safe Decision Cảnh Báo Tại Biên Ngay Cả Khi Mất Network
            │
            ▼
-Publish Telemetry & Event Qua MQTT Lên WISE-IoT Cloud → Display Trên Web Dashboard
+Publish Telemetry & Event Qua MQTT / WebSocket Lên Dashboard & Cloud
 ```
 
 ### 1. Perception Layer - Field Data Acquisition
 
 - Node Cảm Biến Bố Trí Tại Compressor Station, Throttle Valve, Storage Tank
 - ESP32 Sampling Liên Tục Từ Sensor Array:
-  - ZE03-H2S / MQ136: Đo Nồng Độ Target Gas H2S
-  - MQ135: Đo Background Gas VOCs, Smoke, NH3 Nhận Diện Nền Khí Tạo Gas Fingerprint
-  - DHT22: Bù Drift Nhiệt Ẩm Cho MOS Sensor
+  - **MQ136 / ZE03-H2S**: Đo Nồng Độ Target Gas H2S
+  - **MQ135**: Đo Background Gas VOCs, Smoke, NH3 Nhận Diện Nền Khí Tạo Gas Fingerprint
+  - **DHT22**: Bù Drift Nhiệt Ẩm Cho Cảm Biến Bán Dẫn MOS
 - ESP32 Lọc Tín Hiệu Sơ Cấp & Map Vào Modbus Holding Registers 16-Bit
 
 ### 2. Communication Layer - Industrial Anti-Interference Bus
@@ -146,41 +148,55 @@ Publish Telemetry & Event Qua MQTT Lên WISE-IoT Cloud → Display Trên Web Das
 
 - Raspberry Pi 5 Làm Gateway Modbus Master Polling Chu Kỳ 1s → 2s
 - Preprocessing Pipeline:
-  - Digital Filtering Bằng EMA Filter (α=0.2)
-  - Normalize Giá Trị Sensor So Với Clean Air Baseline
+  - Digital Filtering Bằng EMA Filter ($\alpha=0.2$)
+  - Bù Trôi Nhiệt Độ / Độ Ẩm: $\text{compFactor} = 1.0 + 0.0035 \times (T - 25.0) + 0.0015 \times (H - 60.0)$
+  - Hardware Despike Filter: Tự động phát hiện và nội suy làm mượt gai xung phần cứng tại điểm ~125
   - Temporal Sliding Window 20 Bước Thời Gian Cho Khảo Sát Động Học
 - Edge AI Inference:
-  - RandomForest Dual-Mode Model Chạy Trên 4 Nhân Cortex-A76
-  - Pulse-Level: Phân Tích Toàn Bộ Pulse (250 points / 60s) → Gas Classification + ppm Estimation
-  - Window-Level: Streaming Inference Từ 20-Step Sliding Window → Real-Time Detection
+  - **RandomForest Dual-Mode Model** Chạy Trên 4 Nhân Cortex-A76
+  - **Pulse-Level**: Phân Tích Toàn Bộ Pulse (250 points / 60s) $\rightarrow$ Gas Classification + ppm Estimation
+  - **Window-Level**: Streaming Inference Từ 20-Step Sliding Window $\rightarrow$ Real-Time Detection
   - Phân Tích Gas Fingerprint Matrix Tách Biệt H2S / NH3 Leakage Với Clean Air
   - Real-Time Risk Classification 4 Level:
     - **Normal**: Safe Baseline - Dưới Ngưỡng Phát Hiện
     - **Warning**: Early Leakage - H2S ≥1 ppm Hoặc NH3 ≥25 ppm
     - **Hazardous**: Exceed OSHA PEL - H2S ≥10 ppm Hoặc NH3 ≥50 ppm
     - **Emergency**: IDLH Danger - H2S ≥50 ppm Hoặc NH3 ≥100 ppm
-- Fail-Safe Offline Mode: Local SQLite Logging & Cảnh Báo Hoạt Động Độc Lập 100% Khi Mất Network
+- Fail-Safe Offline Mode: Lưu trữ Local CSV/SQLite & Cảnh Báo Hoạt Động Độc Lập 100% Khi Mất Network
 
 ### 4. Cloud Platform Layer - Cloud Synchronization & Analytics
 
-- Gateway Publish Telemetry & Alert Event Qua MQTT Lên WISE-IoT
-- WISE-IoT Platform:
-  - Time-Series DB Lưu Trữ Lịch Sử
-  - Device Health & Heartbeat Management
-  - Alert Dispatch Qua Email
+- Gateway Publish Telemetry & Alert Event Qua MQTT Lên WISE-IoT & Firebase Realtime Database
+- Đồng Bộ 2 Chiều: Cập Nhật Trạng Thái Thiết Bị, Phân Tích Lịch Sử, Dispatch Alert Qua Email
 
 ### 5. Application Layer - Visual Monitoring & Operations
 
-- Web Dashboard:
-  - Real-Time Industrial Dark Mode UI (Tailwind CSS + Chart.js)
-  - 6 KPI Cards: Concentration, Sensor S3, Predicted Gas, Horizon +20s, Safety Status, Model Accuracy
-  - 4 Live Charts: Gas Probability Bar, S3 Waveform Line, Velocity/Kinetics Area, Classification Donut
-  - RF Inference Latency Chart & AI Confidence Gauge
-  - Hardware Status Monitoring: CPU, Memory, RS-485 Bus, MQTT Sync
-  - 4 Scenario Modes: Field Scenario (Auto), H2S Lethal Leak, NH3 Industrial, Clean Air Baseline
-  - Alarm System: Audio Tones, Alert Banners, Event Audit Log
-  - CSV Export & Email Dispatch Simulation
-- Operator Workflow: Định Vị Điểm Leak, Nhấn Acknowledge Để Log Response Time & Kích Hoạt Đội Safety Cô Lập Tuyến Ống
+Hệ thống cung cấp **2 giao diện web chuyên biệt**:
+
+#### A. Main Operations Dashboard (`dashboard/index.html`)
+- **Real-Time Industrial Dark Mode UI**: Thiết kế giao diện công nghiệp chuẩn SCADA (Tailwind CSS + Chart.js + Lucide Icons).
+- **6 KPI Cards**: Concentration (ppm), Sensor S3 Voltage & Velocity Slope (%/s), Target Gas Classification, Projected +20s Horizon, Risk Safety Level, Model Accuracy & Confidence.
+- **Biểu Đồ Trực Quan Thời Gian Thực**:
+  - **Gas Probability Bar**: Xác suất phân loại tức thời từ mô hình Random Forest (Clean Air, H2S, NH3).
+  - **WaveCycle Oscilloscope (250 Points / 60s)**: Biểu đồ dao động ký tích hợp chu kỳ sóng 250 điểm, cơ chế **Sweep Overwrite (chạy đè dữ liệu cũ)**, hiển thị vệt sóng chu kỳ trước (**Ghost Trace**), con trỏ phát sáng tại điểm quét hoạt động, tự động đổi màu theo trạng thái cảnh báo (*Normal / Warning / Hazardous / Emergency*), thanh tiến trình chu kỳ 0–100% và chỉ số `Point: X/249 (Xs)`.
+  - **Classification Donut**: Tỉ lệ nhận diện thành phần khí.
+  - **AI Confidence Gauge & RF Inference Latency Chart**: Đánh giá độ trễ suy luận (~2-4 ms).
+- **Hardware Status Monitoring**: Giám sát CPU RPi 5, Memory Buffer, RS-485 Bus Traffic, MQTT Cloud Sync.
+- **4 Scenario Modes**:
+  - `Field Industrial Scenario (Auto)`: Kịch bản liên hoàn 4 giai đoạn (*Baseline $\rightarrow$ H2S Leakage $\rightarrow$ Recovery $\rightarrow$ NH3 Exhaust*).
+  - `H2S Lethal Leak Run (0 - 10 ppm)`: Kiểm thử phản ứng rò rỉ khí H2S.
+  - `NH3 Industrial Run (0 - 100 ppm)`: Kiểm thử phơi nhiễm NH3 công nghiệp.
+  - `Clean Air Baseline (Ambient)`: Kiểm tra đường nền sạch.
+- **Hệ Thống Báo Động & Vận Hành**: Âm thanh cảnh báo (Web Audio API), Alert Banner khẩn cấp, Bảng Audit Log, Xuất CSV và Giả lập gửi Email Dispatch tới đội an toàn nhà máy.
+
+#### B. Live Hardware Experiment Dashboard (`dashboard/experiment.html`)
+- **Oscilloscope WaveCycle Trực Tiếp Từ Phần Cứng**: Kết nối trực tiếp qua **Firebase Realtime Database** (SSE Stream) hoặc WebSocket Gateway.
+- **Dual-Sensor Monitoring**: Giám sát đồng thời 2 kênh cảm biến **Voltage 1 (MQ135)** và **Voltage 2 (MQ136)**.
+- **Real-Time Despike Filter**: Bật/tắt bộ lọc loại bỏ gai phần cứng tại mốc ~điểm 125.
+- **Ghost Trace Comparison**: Bật/tắt đường sóng chu kỳ trước để đối chiếu sai lệch đáp ứng.
+- **Chế Độ Hiển Thị**: Chuyển đổi giữa *Per Point (0–249)* và *Per Second (0–60s)*; kiểu sóng *Liền Mạch (Continuous)* hoặc *Quét Đè (Sweep Overwrite)*.
+- **WaveCycle History Log**: Tự động lưu bảng lịch sử các chu kỳ sóng đã hoàn thành (*Cycle #, Max V1, Min V1, $\Delta V$, AUC, Peak Point, Risk*).
+- **Xuất Dữ Liệu Thực Nghiệm**: Tải báo cáo CSV cho từng gói tin thô (*Raw Packets CSV*) hoặc từng chu kỳ hoàn chỉnh (*Cycles Report CSV*).
 
 ---
 
@@ -188,27 +204,27 @@ Publish Telemetry & Event Qua MQTT Lên WISE-IoT Cloud → Display Trên Web Das
 
 ### Raw Data Collection
 
-Mỗi file CSV chứa dữ liệu cảm biến S3 (Rg/Ra) ghi trong 60 giây, mỗi pulse 250 điểm dữ liệu.
+Mỗi file CSV chứa dữ liệu cảm biến S3 ($R_g / R_a$) ghi trong 60 giây, mỗi pulse/WaveCycle gồm 250 điểm dữ liệu:
 
-| File | Gas | Pulses |
-|------|-----|--------|
-| `data/h2s_sensor_1.csv` | H2S (1, 5, 10 ppm) | ~45 pulses |
-| `data/nh3_sensor_1.csv` | NH3 (10, 50, 100 ppm) | ~40 pulses |
-| `data/air_clean_sensor_1.csv` | Clean Air (0 ppm) | ~25 pulses |
+| File | Gas | Pulses | Ghi Chú |
+|------|-----|--------|---------|
+| `data/h2s_sensor_1.csv` | H2S (1, 5, 10 ppm) | 47 pulses | 1–16: 1ppm, 17–32: 5ppm, 33–47: 10ppm |
+| `data/nh3_sensor_1.csv` | NH3 (10, 50, 100 ppm) | 44 pulses | 1–15: 10ppm, 16–30: 50ppm, 31+: 100ppm |
+| `data/air_clean_sensor_1.csv` | Clean Air (0 ppm) | 30 pulses | Baseline không khí sạch |
 
 ### Data Cleaning (`clean_sensor_data.py`)
 
-- Loại bỏ hardware spike artifacts (đường thẳng đột ngột do lỗi phần cứng ~30s)
-- Áp dụng Savitzky-Golay smoothing filter
-- Loại bỏ outlier pulses bằng IQR method
-- Output: `*_clean.csv` files
+- Loại bỏ hardware spike artifacts (bước nhảy điện áp đột ngột do phần cứng tại điểm ~125 bằng nội suy Cubic Spline)
+- Áp dụng Savitzky-Golay smoothing filter (window=9, polyorder=2)
+- Loại bỏ outlier pulses bằng IQR & MAE vs median profile
+- Output: `data/*_clean.csv`
 
 ### Model Training (`backend/train.py`)
 
-- Feature Engineering: Statistical moments (mean, std, min, max, delta, slope) + anchor point sampling
-- Dual-mode training: Pulse-level (offline) & Window-level (streaming)
-- Validation: Zero-overlap stratified pulse cross-validation
-- Artifacts: `model_gas.pkl`, `model_ppm.pkl`, `model_pulse_gas.pkl`, `model_pulse_ppm.pkl`
+- **Feature Engineering**: Statistical moments (mean, std, min, max, delta, slope, AUC) + 10 anchor points cố định dọc chu kỳ 60s
+- **Dual-Mode Training**: Pulse-level (offline 250 điểm) & Window-level (streaming sliding window 20 điểm)
+- **Validation**: Zero-overlap stratified pulse cross-validation
+- **Artifacts Sinh Ra**: `model_gas.pkl`, `model_ppm.pkl`, `model_pulse_gas.pkl`, `model_pulse_ppm.pkl`, `scaler.pkl`, `gas_profiles.json`, `pulse_samples.json`, `classes.json`, `metrics.json`
 
 ---
 
@@ -216,41 +232,49 @@ Mỗi file CSV chứa dữ liệu cảm biến S3 (Rg/Ra) ghi trong 60 giây, m�
 
 ```
 AIoT/
-├── README.md                          # Project documentation
-├── clean_sensor_data.py               # Data cleaning pipeline
-├── plot_sensors.py                    # Sensor data visualization
+├── README.md                          # Tài liệu tổng quan dự án
+├── clean_sensor_data.py               # Pipeline làm sạch dữ liệu & khử gai phần cứng
+├── plot_sensors.py                    # Script trực quan hóa phổ sóng cảm biến
 ├── backend/
-│   ├── app.py                         # FastAPI server + WebSocket streaming
-│   ├── train.py                       # RandomForest dual-mode training
-│   ├── gateway.py                     # Modbus RTU gateway
-│   ├── requirements.txt               # Python dependencies
-│   ├── classes.json                   # Model metadata & metrics
-│   ├── model_gas.pkl                  # Window-level gas classifier
-│   ├── model_ppm.pkl                  # Window-level ppm regressor
-│   ├── model_pulse_gas.pkl            # Pulse-level gas classifier
-│   ├── model_pulse_ppm.pkl            # Pulse-level ppm regressor
+│   ├── app.py                         # FastAPI server, REST API & WebSocket gateways (/stream, /ws/live_experiment, /predict)
+│   ├── train.py                       # Huấn luyện mô hình RandomForest Dual-Mode & trích xuất profile
+│   ├── gateway.py                     # Modbus RTU gateway đọc dữ liệu RS-485
+│   ├── firebase.py                    # Dịch vụ Firebase RTDB SSE client, live buffer & CSV recorder
+│   ├── requirements.txt               # Danh sách thư viện Python phụ thuộc
+│   ├── classes.json                   # Metadata phân lớp và cấu hình model
+│   ├── metrics.json                   # Chỉ số đánh giá mô hình (Accuracy, MAE, R², Confusion Matrix)
+│   ├── model_gas.pkl                  # Window-level classifier (RandomForest)
+│   ├── model_ppm.pkl                  # Window-level ppm regressor (RandomForest)
+│   ├── model_pulse_gas.pkl            # Pulse-level classifier (RandomForest)
+│   ├── model_pulse_ppm.pkl            # Pulse-level ppm regressor (RandomForest)
 │   └── scaler.pkl                     # Feature scaler
 ├── dashboard/
-│   ├── index.html                     # Industrial dark-mode dashboard (single-file SPA)
-│   ├── gas_profiles.json              # Gas profile visualization data
-│   ├── model_metrics.json             # Model performance metrics for UI
-│   └── pulse_samples.json             # Sample pulse data for visualization
+│   ├── index.html                     # Web Dashboard vận hành chính (Song ngữ Anh-Việt, Dark/Light mode)
+│   ├── experiment.html                # Web Dashboard thực nghiệm dao động ký WaveCycle & E-Nose trực tiếp
+│   ├── theme.css                      # Hệ thống CSS theme (Dark/Light mode, độ tương phản cao, SCADA industrial)
+│   ├── i18n-theme.js                  # Quản lý đa ngôn ngữ (VI/EN) & chuyển đổi giao diện sáng/tối tự động lưu trữ
+│   ├── gas_profiles.json              # Dữ liệu đường cong đáp ứng trung bình & độ lệch chuẩn từng loại khí
+│   ├── model_metrics.json             # Chỉ số huấn luyện phục vụ hiển thị trên giao diện
+│   └── pulse_samples.json             # Tập mẫu WaveCycle tiêu biểu dùng cho đối chiếu dạng sóng
 ├── data/
-│   ├── h2s_sensor_1.csv               # Raw H2S sensor data
-│   ├── h2s_sensor_1_clean.csv         # Cleaned H2S data
-│   ├── nh3_sensor_1.csv               # Raw NH3 sensor data
-│   ├── nh3_sensor_1_clean.csv         # Cleaned NH3 data
-│   ├── air_clean_sensor_1.csv         # Raw clean air data
-│   └── air_clean_sensor_1_clean.csv   # Cleaned clean air data
+│   ├── h2s_sensor_1.csv               # Dữ liệu thô cảm biến Sensor 1 đo H2S
+│   ├── h2s_sensor_1_clean.csv         # Dữ liệu H2S sau làm sạch & khử gai
+│   ├── nh3_sensor_1.csv               # Dữ liệu thô cảm biến Sensor 1 đo NH3
+│   ├── nh3_sensor_1_clean.csv         # Dữ liệu NH3 sau làm sạch & khử gai
+│   ├── air_clean_sensor_1.csv         # Dữ liệu thô không khí sạch
+│   ├── air_clean_sensor_1_clean.csv   # Dữ liệu không khí sạch sau làm sạch
+│   ├── CleanAir_live.csv              # Dữ liệu stream thực nghiệm trực tiếp từ Firebase
+│   ├── H2S_live.csv                   # Dữ liệu H2S stream thực nghiệm
+│   └── NH3_live.csv                   # Dữ liệu NH3 stream thực nghiệm
 └── docs/
-    └── UseCase.md                     # Use case documentation
+    └── UseCase.md                     # Tài liệu kịch bản sử dụng chi tiết
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Setup Environment
+### 1. Thiết Lập Môi Trường (Setup Environment)
 
 ```bash
 cd g:\Project\AIoT
@@ -259,19 +283,19 @@ python -m venv .venv
 pip install -r backend/requirements.txt
 ```
 
-### 2. Clean Sensor Data (Optional - Already Cleaned)
+### 2. Làm Sạch Dữ Liệu Cảm Biến (Data Cleaning)
 
 ```bash
 python clean_sensor_data.py
 ```
 
-### 3. Train Models
+### 3. Huấn Luyện Lại Mô Hình (Train Models)
 
 ```bash
 python -m backend.train
 ```
 
-Expected output:
+Kết quả kỳ vọng:
 ```
 Pulse Classification Accuracy: 95.76%
 Pulse Concentration MAE:       5.58 ppm (R2: 0.7947)
@@ -279,25 +303,28 @@ Window Real-Time Accuracy:     94.97%
 Window ppm MAE:                2.47 ppm (R2: 0.9333)
 ```
 
-### 4. Start Server & Dashboard
+### 4. Khởi Chạy Server & Web Dashboard
 
 ```bash
 python -m uvicorn backend.app:app --host 127.0.0.1 --port 8001
 ```
 
-Open browser: **http://127.0.0.1:8001**
+Mở trình duyệt truy cập:
+- **Operations Dashboard (Giám Sát Vận Hành SCADA):** [http://127.0.0.1:8001](http://127.0.0.1:8001) hoặc [http://127.0.0.1:8001/dashboard/index.html](http://127.0.0.1:8001/dashboard/index.html)
+- **Live Hardware Experiment (Thực Nghiệm Phần Cứng E-Nose):** [http://127.0.0.1:8001/dashboard/experiment.html](http://127.0.0.1:8001/dashboard/experiment.html)
 
 ---
 
 ## Technology Stack
 
-| Component | Technology |
-|-----------|-----------|
-| **Edge AI Model** | scikit-learn RandomForest (Classifier + Regressor) |
-| **Backend Server** | FastAPI + Uvicorn (Python) |
-| **Real-Time Comm** | WebSocket (streaming) + REST API |
-| **Dashboard UI** | HTML5 + Tailwind CSS + Chart.js + Lucide Icons |
-| **Data Processing** | Pandas + NumPy + SciPy (Savitzky-Golay) |
-| **Hardware Gateway** | Raspberry Pi 5 + ESP32 + RS-485 Modbus RTU |
-| **Cloud Platform** | Advantech WISE-IoT (MQTT) |
-| **Sensor Array** | ZE03-H2S / MQ136 + MQ135 + DHT22 |
+| Thành Phần | Công Nghệ Sử Dụng |
+|------------|-------------------|
+| **Edge AI Model** | scikit-learn RandomForest (Classifier + Regressor), Dual-Mode (Pulse & Window) |
+| **Backend Server** | FastAPI + Uvicorn (Asynchronous Python) |
+| **Real-Time Streaming** | WebSocket (`/stream`, `/ws/live_experiment`) + Firebase Realtime Database (SSE) |
+| **Dashboard UI** | HTML5 + Vanilla CSS + Tailwind CSS (CDN) + Chart.js + Lucide Icons |
+| **Data Processing** | Pandas + NumPy + SciPy (Savitzky-Golay filter & Cubic Spline Interpolation) |
+| **Hardware Gateway** | Raspberry Pi 5 (Quad-core Cortex-A76) + ESP32 Nodes |
+| **Industrial Bus** | RS-485 Modbus RTU (Daisy-Chain Topology) |
+| **Cloud Platforms** | Advantech WISE-IoT (MQTT) & Firebase Realtime Database |
+| **Sensor Array** | MQ136 / ZE03-H2S ($H_2S$) + MQ135 (VOCs/$NH_3$) + DHT22 (Nhiệt/Ẩm) |

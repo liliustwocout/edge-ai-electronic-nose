@@ -10,8 +10,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } } }</script>
+  <script>tailwind.config = { darkMode: 'class', theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } } }</script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="theme.css">
+  <script src="i18n-theme.js"></script>
   <style>
     ::-webkit-scrollbar {
       width: 6px;
@@ -77,32 +79,46 @@
       <button class="text-slate-400 hover:text-slate-200 transition-colors">
         <i data-lucide="menu" class="w-5 h-5"></i>
       </button>
-      <div class=" text-[15px] tracking-tight text-white">
-        WISE-IoTSuite <span class="text-sky-400 ">Dashboard</span>
+      <div class=" text-[15px] tracking-tight text-white font-semibold">
+        WISE-IoTSuite <span class="text-sky-400 font-normal" data-i18n="navDashboard">Dashboard</span>
       </div>
       <div class="hidden md:flex items-center gap-1.5 text-xs text-slate-500">
         <span>&#9638; Dashboard</span>
         <span>&rsaquo;</span>
-        <span class="text-slate-400">Single-Sensor - MQ136 True Edge AI Gateway &bull; TaskForce141</span>
+        <span class="text-slate-400" data-i18n="navBreadcrumb">Single-Sensor - MQ136 True Edge AI Gateway &bull; TaskForce141</span>
       </div>
     </div>
-    <div class="flex items-center gap-2.5 md:gap-3">
+    <div class="flex items-center gap-2 md:gap-2.5">
+      <!-- Language Switcher -->
+      <button id="btnToggleLang"
+        class="theme-lang-btn bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-200"
+        title="Chuyển đổi ngôn ngữ / Switch language">
+        <span>🇻🇳</span> <span class="font-bold">VI</span>
+      </button>
+
+      <!-- Theme Switcher (Light / Dark) -->
+      <button id="btnToggleTheme"
+        class="theme-lang-btn px-2 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-slate-200"
+        title="Giao diện Sáng / Tối">
+        <i data-lucide="moon" class="w-4 h-4 text-sky-300"></i>
+      </button>
+
       <a href="/dashboard/experiment.html"
         class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/40 text-sky-300 text-xs font-medium transition-all shadow-[0_0_12px_rgba(56,189,248,0.25)]">
         <i data-lucide="flask-conical" class="w-3.5 h-3.5 text-sky-400"></i>
-        <span>Thực Nghiệm Realtime</span>
+        <span data-i18n="navExperiment">Thực Nghiệm Realtime</span>
       </a>
       <div id="prognosticsBadge"
         class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[11px]  tracking-wide">
         <i data-lucide="activity" class="w-3.5 h-3.5"></i>
-        <span>AI Prognostics: Safe Baseline</span>
+        <span data-i18n="prognosticsSafe">AI Prognostics: Safe Baseline</span>
       </div>
       <div id="wiseClock"
         class="text-[11px] text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded border border-slate-800 font-mono">
         2026-09-15 00:00:00 UTC
       </div>
       <div class="hidden lg:block text-[11px] text-slate-500 text-right leading-tight">
-        <span>Powered By</span><br>
+        <span data-i18n="poweredBy">Powered By</span><br>
         <strong class="text-slate-300 tracking-wider text-[12px]">WISE-PaaS</strong>
       </div>
     </div>
@@ -117,37 +133,36 @@
             id="alertppm">0.0</strong> ppm! Compressor Station Mode!</span>
       </div>
       <button id="btnAcknowledge"
-        class="px-4 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/50 text-rose-100 rounded text-xs  tracking-wide transition-colors whitespace-nowrap">
-        Acknowledge Alarm
+        class="px-4 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/50 text-rose-100 rounded text-xs tracking-wide transition-colors whitespace-nowrap"
+        data-i18n="btnAcknowledge">
+        Xác Nhận Báo Động
       </button>
     </div>
     <section
       class="bg-slate-900/50 border border-slate-800 rounded p-2.5 flex items-center justify-between flex-wrap gap-3">
       <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-hide">
-        <span class="text-[11px] text-slate-400  mr-1 whitespace-nowrap">Mode:</span>
+        <span class="text-[11px] text-slate-400 mr-1 whitespace-nowrap" data-i18n="modeLabel">Kịch Bản:</span>
         <button
           class="gasTab active px-3 py-1.5 rounded bg-sky-500/10 border border-sky-500 text-sky-400 text-xs whitespace-nowrap transition-colors"
-          data-mode="fieldScenario">Field Scenario - Auto</button>
+          data-mode="fieldScenario" data-i18n="modeFieldScenario">Kịch Bản Thực Địa - Tự Động</button>
         <button
           class="gasTab px-3 py-1.5 rounded bg-slate-800/50 border border-slate-700 hover:bg-slate-800 hover:border-slate-600 text-slate-400 text-xs whitespace-nowrap transition-colors"
-          data-mode="H2SRun">H2S Lethal Leak - 0 - 10 ppm</button>
+          data-mode="H2SRun" data-i18n="modeH2SRun">Rò Rỉ H2S Nguy Hiểm - 0 - 10 ppm</button>
         <button
           class="gasTab px-3 py-1.5 rounded bg-slate-800/50 border border-slate-700 hover:bg-slate-800 hover:border-slate-600 text-slate-400 text-xs whitespace-nowrap transition-colors"
-          data-mode="NH3Run">NH3 Industrial - 0 - 100 ppm</button>
+          data-mode="NH3Run" data-i18n="modeNH3Run">Khí NH3 Công Nghiệp - 0 - 100 ppm</button>
         <button
           class="gasTab px-3 py-1.5 rounded bg-slate-800/50 border border-slate-700 hover:bg-slate-800 hover:border-slate-600 text-slate-400 text-xs whitespace-nowrap transition-colors"
-          data-mode="airRun">Clean Air Baseline</button>
+          data-mode="airRun" data-i18n="modeAirRun">Không Khí Sạch Chuẩn</button>
       </div>
       <div class="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
         <button id="btnToggleEma"
-          class="px-3 py-1.5 rounded bg-sky-500/10 border border-sky-500/50 text-sky-400 text-xs whitespace-nowrap">EMA
-          Filter: On - α=0.2</button>
+          class="px-3 py-1.5 rounded bg-sky-500/10 border border-sky-500/50 text-sky-400 text-xs whitespace-nowrap" data-i18n="emaFilterOn">Bộ Lọc EMA: Bật - α=0.2</button>
         <button id="btnToggleDrift"
-          class="px-3 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 text-xs whitespace-nowrap">Drift
-          Comp: Active</button>
+          class="px-3 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 text-xs whitespace-nowrap" data-i18n="driftCompOn">Bù Trôi (Drift): Bật</button>
         <button id="btnPlayPause"
           class="px-3 py-1.5 rounded bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 text-xs whitespace-nowrap flex items-center gap-1"><i
-            data-lucide="pause" class="w-3.5 h-3.5"></i> Pause</button>
+            data-lucide="pause" class="w-3.5 h-3.5"></i> <span id="playPauseText" data-i18n="btnPause">Tạm Dừng</span></button>
         <button id="speed1x"
           class="speedBtn active px-2.5 py-1.5 rounded bg-sky-500/10 border border-sky-500/50 text-sky-400 text-xs ">1x</button>
         <button id="speed2x"
@@ -158,52 +173,52 @@
       <div
         class="flex flex-col justify-between p-3.5 min-h-[86px] rounded border border-emerald-500/40 bg-emerald-950/20 shadow-[0_0_15px_rgba(16,185,129,0.05)]">
         <div class="text-[10px] text-emerald-400/80  tracking-wider flex items-center gap-1.5">
-          <i data-lucide="cloud-fog" class="w-3.5 h-3.5"></i> Estimated Concentration
+          <i data-lucide="cloud-fog" class="w-3.5 h-3.5"></i> <span data-i18n="kpiEstConcentration">Nồng Độ Ước Tính</span>
         </div>
         <div class="text-[22px] text-emerald-300 tracking-tight mt-1" id="kpippmVal">0.0 ppm</div>
-        <div class="text-[10px] text-emerald-500/70 mt-1 truncate">Active: <span id="currentGasTitle">Field Scenario -
+        <div class="text-[10px] text-emerald-500/70 mt-1 truncate"><span data-i18n="kpiActiveScenario">Kịch bản:</span> <span id="currentGasTitle">Field Scenario -
             Auto</span></div>
       </div>
       <div
         class="flex flex-col justify-between p-3.5 min-h-[86px] rounded border border-amber-500/40 bg-amber-950/20 shadow-[0_0_15px_rgba(245,158,11,0.05)]">
         <div class="text-[10px] text-amber-400/80  tracking-wider flex items-center gap-1.5">
-          <i data-lucide="zap" class="w-3.5 h-3.5"></i> Sensor MQ136 &amp; dV/dt
+          <i data-lucide="zap" class="w-3.5 h-3.5"></i> <span data-i18n="kpiSensorDvDt">Cảm Biến MQ136 &amp; dV/dt</span>
         </div>
         <div class="text-[22px] text-amber-300 tracking-tight mt-1" id="kpiPeakSensorVal">1.000 V - +0.0%/s</div>
-        <div class="text-[10px] text-amber-500/70 mt-1 truncate" id="tteSubDesc">TTE: Safe Stability</div>
+        <div class="text-[10px] text-amber-500/70 mt-1 truncate" id="tteSubDesc" data-i18n="kpiTteSafe">TTE: Trạng Thái Ổn Định An Toàn</div>
       </div>
       <div
         class="flex flex-col justify-between p-3.5 min-h-[86px] rounded border border-fuchsia-500/40 bg-fuchsia-950/20 shadow-[0_0_15px_rgba(192,38,211,0.05)]">
         <div class="text-[10px] text-fuchsia-400/80  tracking-wider flex items-center gap-1.5">
-          <i data-lucide="brain-circuit" class="w-3.5 h-3.5"></i> ML Predicted Gas
+          <i data-lucide="brain-circuit" class="w-3.5 h-3.5"></i> <span data-i18n="kpiMlGas">Khí Nhận Diện ML</span>
         </div>
         <div class="text-[22px] text-fuchsia-300 tracking-tight mt-1 truncate" id="kpiTotalSampleVal">Clean Air - Safe
         </div>
-        <div class="text-[10px] text-fuchsia-500/70 mt-1 truncate">RandomForest Dual-Mode</div>
+        <div class="text-[10px] text-fuchsia-500/70 mt-1 truncate" data-i18n="kpiRfDualMode">RandomForest Song Song</div>
       </div>
       <div
         class="flex flex-col justify-between p-3.5 min-h-[86px] rounded border border-sky-500/40 bg-sky-950/20 shadow-[0_0_15px_rgba(2,132,199,0.05)]">
         <div class="text-[10px] text-sky-400/80  tracking-wider flex items-center gap-1.5">
-          <i data-lucide="fast-forward" class="w-3.5 h-3.5"></i> Predicted Horizon - +20s
+          <i data-lucide="fast-forward" class="w-3.5 h-3.5"></i> <span data-i18n="kpiPredictedHorizon">Dự Đoán Tương Lai - +20s</span>
         </div>
         <div class="text-[22px] text-sky-300 tracking-tight mt-1" id="kpiRangeVal">1.000 V</div>
-        <div class="text-[10px] text-sky-500/70 mt-1 truncate">Extrapolated Trajectory</div>
+        <div class="text-[10px] text-sky-500/70 mt-1 truncate" data-i18n="kpiExtrapolated">Quỹ Đạo Ngoại Suy</div>
       </div>
       <div
         class="flex flex-col justify-between p-3.5 min-h-[86px] rounded border border-rose-500/40 bg-rose-950/20 shadow-[0_0_15px_rgba(225,29,72,0.05)]">
         <div class="text-[10px] text-rose-400/80  tracking-wider flex items-center gap-1.5">
-          <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> Safety Status
+          <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> <span data-i18n="kpiSafetyStatus">Trạng Thái An Toàn</span>
         </div>
-        <div class="text-[22px] text-rose-300 tracking-tight mt-1" id="kpiRiskVal">Normal</div>
-        <div class="text-[10px] text-rose-500/70 mt-1 truncate">Threshold Check OSHA PEL</div>
+        <div class="text-[22px] text-rose-300 tracking-tight mt-1" id="kpiRiskVal">Bình Thường</div>
+        <div class="text-[10px] text-rose-500/70 mt-1 truncate" data-i18n="kpiThresholdOsha">Kiểm Tra Ngưỡng OSHA PEL</div>
       </div>
       <div
         class="flex flex-col justify-between p-3.5 min-h-[86px] rounded border border-teal-500/40 bg-teal-950/20 shadow-[0_0_15px_rgba(13,148,136,0.05)]">
         <div class="text-[10px] text-teal-400/80  tracking-wider flex items-center gap-1.5">
-          <i data-lucide="target" class="w-3.5 h-3.5"></i> RF Model Accuracy
+          <i data-lucide="target" class="w-3.5 h-3.5"></i> <span data-i18n="kpiModelAccuracy">Độ Chính Xác Mô Hình RF</span>
         </div>
         <div class="text-[22px] text-teal-300 tracking-tight mt-1" id="kpiMapeVal">95.8% Accuracy</div>
-        <div class="text-[10px] text-teal-500/70 mt-1 truncate">RandomForest &bull; Edge AI</div>
+        <div class="text-[10px] text-teal-500/70 mt-1 truncate" data-i18n="kpiRfEdgeAi">RandomForest &bull; Edge AI</div>
       </div>
     </section>
     <section class="grid grid-cols-1 lg:grid-cols-12 gap-3">
@@ -211,7 +226,7 @@
         class="col-span-1 lg:col-span-3 rounded border border-slate-800 bg-slate-900/50 flex flex-col overflow-hidden">
         <div class="flex items-center justify-between px-3 py-2.5 border-b border-slate-800 bg-slate-900/80">
           <h3 class="text-xs text-slate-200 flex items-center gap-1.5"><i data-lucide="bar-chart-2"
-              class="w-4 h-4 text-sky-400"></i> Gas Probability</h3>
+              class="w-4 h-4 text-sky-400"></i> <span data-i18n="chartGasProb">Xác Suất Khí</span></h3>
           <span class="text-[9px] text-sky-400 font-mono tracking-wider bg-sky-400/10 px-1.5 py-0.5 rounded">RF
             Prob</span>
         </div>
@@ -224,19 +239,19 @@
         <div class="flex items-center justify-between px-3 py-2.5 border-b border-slate-800 bg-slate-900/80">
           <div class="flex items-center gap-2">
             <h3 class="text-xs text-slate-200 flex items-center gap-1.5"><i data-lucide="waves"
-                class="w-4 h-4 text-cyan-400"></i> WaveCycle Oscilloscope (250 Points / 60s)</h3>
+                class="w-4 h-4 text-cyan-400"></i> <span data-i18n="chartWaveCycle">Dao Động Ký Chu Kỳ Sóng (250 Điểm / 60s)</span></h3>
             <span id="waveCycleNumBadge" class="text-[10px] text-cyan-400 font-mono tracking-wider bg-cyan-400/10 px-2 py-0.5 rounded border border-cyan-500/20">Cycle #1</span>
           </div>
           <div class="flex items-center gap-2">
             <span id="wavePointBadge" class="text-[10px] text-slate-300 font-mono bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">Point: <strong id="waveCurrentPoint" class="text-cyan-300">0</strong>/249 (<span id="waveCurrentSec">0.0s</span>)</span>
-            <span class="text-[9px] text-emerald-400 font-mono tracking-wider bg-emerald-400/10 px-1.5 py-0.5 rounded border border-emerald-500/20">Sweep Overwrite</span>
+            <span class="text-[9px] text-emerald-400 font-mono tracking-wider bg-emerald-400/10 px-1.5 py-0.5 rounded border border-emerald-500/20" data-i18n="sweepOverwrite">Quét Đè (Sweep Overwrite)</span>
           </div>
         </div>
         <div class="p-3 flex-1 relative min-h-[220px]">
           <canvas id="waveCycleChart"></canvas>
         </div>
         <div class="px-3 pb-2 pt-0 flex items-center gap-2">
-          <span class="text-[9px] font-mono text-slate-500 whitespace-nowrap">Tiến trình chu kỳ:</span>
+          <span class="text-[9px] font-mono text-slate-500 whitespace-nowrap" data-i18n="chartCycleProgress">Tiến trình chu kỳ:</span>
           <div class="flex-1 h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
             <div id="waveCycleProgressBar" class="h-full bg-gradient-to-r from-cyan-500 via-sky-400 to-emerald-400 transition-all duration-150" style="width: 0%;"></div>
           </div>
@@ -247,13 +262,13 @@
         class="col-span-1 lg:col-span-2 rounded border border-slate-800 bg-slate-900/50 flex flex-col overflow-hidden">
         <div class="flex items-center justify-between px-3 py-2.5 border-b border-slate-800 bg-slate-900/80">
           <h3 class="text-xs text-slate-200 flex items-center gap-1.5"><i data-lucide="pie-chart"
-              class="w-4 h-4 text-fuchsia-400"></i> Classification</h3>
+              class="w-4 h-4 text-fuchsia-400"></i> <span data-i18n="chartClassification">Phân Loại</span></h3>
         </div>
         <div class="p-3 flex-1 relative min-h-[220px] flex items-center justify-center">
           <canvas id="donutArrayChart"></canvas>
           <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-4">
             <div class="text-xl text-white">MQ136</div>
-            <div class="text-[9px] text-slate-400  tracking-widest">Sensor</div>
+            <div class="text-[9px] text-slate-400 tracking-widest">Sensor</div>
           </div>
         </div>
       </div>
@@ -263,11 +278,11 @@
         class="col-span-1 lg:col-span-3 rounded border border-slate-800 bg-slate-900/50 flex flex-col overflow-hidden">
         <div class="flex items-center justify-between px-3 py-2.5 border-b border-slate-800 bg-slate-900/80">
           <h3 class="text-xs text-slate-200 flex items-center gap-1.5"><i data-lucide="cpu"
-              class="w-4 h-4 text-sky-400"></i> Hardware Status</h3>
+              class="w-4 h-4 text-sky-400"></i> <span data-i18n="chartHardwareStatus">Trạng Thái Phần Cứng</span></h3>
         </div>
         <div class="p-4 flex flex-col gap-3">
           <div class="flex flex-col gap-1.5">
-            <div class="flex justify-between text-[11px] text-slate-400"><span>CPU Usage - RPi 5</span><strong
+            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="cpuUsage">Tải CPU - RPi 5</span><strong
                 id="barCpuTxt" class="text-slate-200">0.0%</strong></div>
             <div class="h-2 bg-slate-800 rounded overflow-hidden border border-slate-700/50">
               <div id="barCpuFill"
@@ -275,7 +290,7 @@
             </div>
           </div>
           <div class="flex flex-col gap-1.5">
-            <div class="flex justify-between text-[11px] text-slate-400"><span>Memory - Edge Buffer</span><strong
+            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="memBuffer">Bộ Nhớ - Edge Buffer</span><strong
                 id="barMemTxt" class="text-slate-200">0.0%</strong></div>
             <div class="h-2 bg-slate-800 rounded overflow-hidden border border-slate-700/50">
               <div id="barMemFill"
@@ -283,14 +298,14 @@
             </div>
           </div>
           <div class="flex flex-col gap-1.5">
-            <div class="flex justify-between text-[11px] text-slate-400"><span>Model Footprint - RF</span><strong
+            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="modelFootprint">Kích Thước Mô Hình - RF</span><strong
                 class="text-slate-200">4.8 MB</strong></div>
             <div class="h-2 bg-slate-800 rounded overflow-hidden border border-slate-700/50">
               <div class="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 w-[12%]"></div>
             </div>
           </div>
           <div class="flex flex-col gap-1.5">
-            <div class="flex justify-between text-[11px] text-slate-400"><span>RS-485 Modbus RTU Load</span><strong
+            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="busLoad">Tải Bus RS-485 Modbus RTU</span><strong
                 id="barBusTxt" class="text-slate-200">0.0%</strong></div>
             <div class="h-2 bg-slate-800 rounded overflow-hidden border border-slate-700/50">
               <div id="barBusFill"
@@ -298,7 +313,7 @@
             </div>
           </div>
           <div class="flex flex-col gap-1.5">
-            <div class="flex justify-between text-[11px] text-slate-400"><span>MQTT Cloud Sync</span><strong
+            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="mqttSync">Đồng Bộ Đám Mây MQTT</span><strong
                 id="barMqttTxt" class="text-slate-200">0.0%</strong></div>
             <div class="h-2 bg-slate-800 rounded overflow-hidden border border-slate-700/50">
               <div id="barMqttFill"
@@ -311,7 +326,7 @@
         class="col-span-1 lg:col-span-3 rounded border border-slate-800 bg-slate-900/50 flex flex-col overflow-hidden">
         <div class="flex items-center justify-between px-3 py-2.5 border-b border-slate-800 bg-slate-900/80">
           <h3 class="text-xs text-slate-200 flex items-center gap-1.5"><i data-lucide="timer"
-              class="w-4 h-4 text-fuchsia-400"></i> RF Inference Latency</h3>
+              class="w-4 h-4 text-fuchsia-400"></i> <span data-i18n="chartLatency">Độ Trễ Suy Luận RF</span></h3>
           <span class="text-[9px] text-fuchsia-400 font-mono tracking-wider bg-fuchsia-400/10 px-1.5 py-0.5 rounded"
             id="latencyBadge">~0ms</span>
         </div>
@@ -323,7 +338,7 @@
         class="col-span-1 lg:col-span-4 rounded border border-slate-800 bg-slate-900/50 flex flex-col overflow-hidden">
         <div class="flex items-center justify-between px-3 py-2.5 border-b border-slate-800 bg-slate-900/80">
           <h3 class="text-xs text-slate-200 flex items-center gap-1.5"><i data-lucide="list"
-              class="w-4 h-4 text-amber-400"></i> Event Audit Log</h3>
+              class="w-4 h-4 text-amber-400"></i> <span data-i18n="chartAuditLog">Nhật Ký Sự Kiện</span></h3>
           <div class="flex items-center gap-2">
             <button id="btnExportCsv"
               class="px-2 py-0.5 border border-slate-700 rounded text-[9px] text-slate-300 hover:bg-slate-800 flex items-center gap-1"><i
@@ -337,10 +352,10 @@
           <table class="w-full text-[11px] text-left border-collapse">
             <thead class="bg-slate-900 text-slate-400 border-b border-slate-800 sticky top-0 z-10">
               <tr>
-                <th class="py-1.5 px-3 ">Time</th>
-                <th class="py-1.5 px-3 ">Node</th>
-                <th class="py-1.5 px-3 ">Identified Gas</th>
-                <th class="py-1.5 px-3 ">Status</th>
+                <th class="py-1.5 px-3 " data-i18n="tableTime">Thời Gian</th>
+                <th class="py-1.5 px-3 " data-i18n="tableNode">Nút Mạng</th>
+                <th class="py-1.5 px-3 " data-i18n="tableGas">Khí Nhận Diện</th>
+                <th class="py-1.5 px-3 " data-i18n="tableStatus">Trạng Thái</th>
               </tr>
             </thead>
             <tbody id="wiseTxTableBody" class="divide-y divide-slate-800/50">
@@ -349,7 +364,7 @@
                 <td class="py-2 px-3 text-slate-400">ESP32 Node 1 - MQ136</td>
                 <td class="py-2 px-3 text-slate-200 ">Clean Air - 0.0 ppm</td>
                 <td class="py-2 px-3"><span
-                    class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-950/50 text-emerald-400 border border-emerald-500/30">Normal</span>
+                    class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-950/50 text-emerald-400 border border-emerald-500/30" data-i18n="normalStatus">Bình Thường</span>
                 </td>
               </tr>
             </tbody>
@@ -360,14 +375,14 @@
         class="col-span-1 lg:col-span-2 rounded border border-slate-800 bg-slate-900/50 flex flex-col overflow-hidden">
         <div class="flex items-center justify-between px-3 py-2.5 border-b border-slate-800 bg-slate-900/80">
           <h3 class="text-xs text-slate-200 flex items-center gap-1.5"><i data-lucide="check-circle-2"
-              class="w-4 h-4 text-emerald-400"></i> AI Confidence</h3>
+              class="w-4 h-4 text-emerald-400"></i> <span data-i18n="chartConfidence">Độ Tin Cậy AI</span></h3>
         </div>
         <div class="p-3 flex-1 flex flex-col items-center justify-center relative">
           <div class="relative w-[150px] h-[95px]">
             <canvas id="gaugeProcessChart"></canvas>
             <div class="absolute bottom-0 left-1/2 -translate-x-1/2 text-center">
               <div class="text-3xl text-white leading-none" id="gaugeDisplayNumber">98</div>
-              <div class="text-[9px] text-slate-400 mt-1  tracking-widest ">Score</div>
+              <div class="text-[9px] text-slate-400 mt-1 tracking-widest" data-i18n="chartScore">Điểm</div>
             </div>
           </div>
         </div>
@@ -381,7 +396,7 @@
         class="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"><i data-lucide="x"
           class="w-5 h-5"></i></button>
       <h3 class="text-sky-400 text-[15px] flex items-center gap-2 mb-4 border-b border-slate-800 pb-3">
-        <i data-lucide="mail" class="w-5 h-5"></i> WISE-IoT Email Dispatch Simulation
+        <i data-lucide="mail" class="w-5 h-5"></i> <span data-i18n="emailTitle">Mô Phỏng Gửi Email Cảnh Báo WISE-IoT</span>
       </h3>
       <div id="emailReportContent"
         class="flex flex-col gap-2 text-[13px] text-slate-300 bg-slate-900 p-4 rounded border border-slate-800">
@@ -519,16 +534,24 @@
       updateLogTableUI() {
         const tbody = document.getElementById('wiseTxTableBody');
         if (!tbody) return;
+        const isVi = window.wiseApp ? window.wiseApp.getLang() === 'vi' : true;
+        const riskMap = {
+          'Normal': isVi ? 'Bình Thường' : 'Normal',
+          'Warning': isVi ? 'Cảnh Báo' : 'Warning',
+          'Hazardous': isVi ? 'Nguy Hại' : 'Hazardous',
+          'Emergency': isVi ? 'Khẩn Cấp' : 'Emergency'
+        };
         tbody.innerHTML = this.alarmHistory.map(entry => {
           let badgeClass = 'bg-emerald-950/50 text-emerald-400 border border-emerald-500/30';
           if (entry.level === 'Warning') badgeClass = 'bg-amber-950/50 text-amber-400 border border-amber-500/30';
           else if (entry.level === 'Hazardous') badgeClass = 'bg-orange-950/50 text-orange-400 border border-orange-500/30';
           else if (entry.level === 'Emergency') badgeClass = 'bg-rose-950/50 text-rose-400 border border-rose-500/30';
+          const levelText = riskMap[entry.level] || entry.level;
           return `<tr>
  <td class="py-2 px-3 text-slate-300">${entry.time}</td>
  <td class="py-2 px-3 text-slate-400">${entry.node}</td>
  <td class="py-2 px-3 text-slate-200 font-medium">${entry.gas} - ${entry.ppm} ppm</td>
- <td class="py-2 px-3"><span class="px-1.5 py-0.5 rounded text-[9px]  tracking-wide ${badgeClass}">${entry.level}</span></td>
+ <td class="py-2 px-3"><span class="px-1.5 py-0.5 rounded text-[9px] tracking-wide ${badgeClass}">${levelText}</span></td>
  </tr>`;
         }).join('');
       }
@@ -580,11 +603,81 @@
         Chart.defaults.scale.grid.color = '#1e293b';
       }
       init() {
+        this.setupThemeAndI18n();
         this.initBarChart();
         this.initWaveCycleChart();
         this.initDonutChart();
         this.initGaugeChart();
         this.initServerLoadChart();
+        if (window.wiseApp) {
+          this.applyTheme(window.wiseApp.isLight());
+          this.applyLanguage();
+        }
+      }
+      setupThemeAndI18n() {
+        window.addEventListener('appThemeChanged', (e) => {
+          this.applyTheme(e.detail.isLight);
+        });
+        window.addEventListener('appLanguageChanged', () => {
+          this.applyLanguage();
+        });
+      }
+      applyTheme(isLight) {
+        const gridColor = isLight ? 'rgba(203, 213, 225, 0.7)' : 'rgba(30, 41, 59, 0.7)';
+        const gridColorLight = isLight ? 'rgba(226, 232, 240, 0.8)' : 'rgba(30, 41, 59, 0.5)';
+        const tickColor = isLight ? '#475569' : '#64748b';
+        const textColor = isLight ? '#334155' : '#94a3b8';
+        const tooltipBg = isLight ? 'rgba(255, 255, 255, 0.96)' : 'rgba(15, 23, 42, 0.95)';
+        const tooltipTitle = isLight ? '#0284c7' : '#38bdf8';
+        const tooltipBody = isLight ? '#0f172a' : '#f1f5f9';
+        const tooltipBorder = isLight ? '#cbd5e1' : '#334155';
+
+        if (this.waveCycleChart) {
+          const s = this.waveCycleChart.options.scales;
+          if (s.x) { s.x.grid.color = gridColorLight; s.x.ticks.color = tickColor; s.x.title.color = textColor; }
+          if (s.y) { s.y.grid.color = gridColor; s.y.ticks.color = tickColor; s.y.title.color = textColor; }
+          const tt = this.waveCycleChart.options.plugins.tooltip;
+          if (tt) { tt.backgroundColor = tooltipBg; tt.titleColor = tooltipTitle; tt.bodyColor = tooltipBody; tt.borderColor = tooltipBorder; }
+          if (this.waveCycleChart.options.plugins.legend && this.waveCycleChart.options.plugins.legend.labels) {
+            this.waveCycleChart.options.plugins.legend.labels.color = textColor;
+          }
+          this.waveCycleChart.update('none');
+        }
+        if (this.barGasProbChart) {
+          const s = this.barGasProbChart.options.scales;
+          if (s.x) s.x.ticks.color = tickColor;
+          if (s.y) s.y.ticks.color = tickColor;
+          this.barGasProbChart.update('none');
+        }
+        if (this.donutGasRatioChart) {
+          if (this.donutGasRatioChart.options.plugins.legend && this.donutGasRatioChart.options.plugins.legend.labels) {
+            this.donutGasRatioChart.options.plugins.legend.labels.color = textColor;
+          }
+          this.donutGasRatioChart.update('none');
+        }
+        if (this.serverLoadChart) {
+          const s = this.serverLoadChart.options.scales;
+          if (s.x) s.x.ticks.color = tickColor;
+          if (s.y) s.y.ticks.color = tickColor;
+          this.serverLoadChart.update('none');
+        }
+      }
+      applyLanguage() {
+        const isVi = window.wiseApp ? window.wiseApp.getLang() === 'vi' : true;
+        if (this.waveCycleChart) {
+          this.waveCycleChart.data.datasets[0].label = isVi ? 'Chu kỳ trước (Ghost Trace)' : 'Previous Cycle (Ghost Trace)';
+          this.waveCycleChart.options.scales.x.title.text = isVi ? 'Điểm chu kỳ (0 - 249) • Chu kỳ sóng 60s' : 'Cycle Point (0 - 249) • 60s WaveCycle';
+          this.waveCycleChart.options.scales.y.title.text = isVi ? 'Điện áp (V)' : 'Voltage (V)';
+          this.waveCycleChart.update('none');
+        }
+        if (this.barGasProbChart) {
+          this.barGasProbChart.data.labels = isVi ? ['Không khí sạch', 'Khí H2S Độc', 'Khí NH3 Kích thích'] : ['Clean Air', 'H2S Toxic', 'NH3 Irritant'];
+          this.barGasProbChart.update('none');
+        }
+        if (this.donutGasRatioChart) {
+          this.donutGasRatioChart.data.labels = isVi ? ['Không khí sạch', 'H2S', 'NH3'] : ['Clean Air', 'H2S', 'NH3'];
+          this.donutGasRatioChart.update('none');
+        }
       }
       initBarChart() {
         const ctx = document.getElementById('barActivityChart').getContext('2d');
@@ -690,7 +783,8 @@
               y: {
                 title: { display: true, text: 'Voltage (V)', color: '#94a3b8', font: { size: 10 } },
                 suggestedMin: 0.0,
-                suggestedMax: 3.5,
+                suggestedMax: 4.2,
+                grace: '8%',
                 ticks: { font: { size: 10 }, color: '#64748b' },
                 grid: { color: 'rgba(30, 41, 59, 0.7)' }
               },
@@ -940,7 +1034,10 @@
         if (btnPlayPause) {
           btnPlayPause.addEventListener('click', () => {
             const isPlaying = this.streamEngine.togglePlay();
-            btnPlayPause.innerHTML = isPlaying ? '<i data-lucide="pause" class="w-3.5 h-3.5"></i> Pause' : '<i data-lucide="play" class="w-3.5 h-3.5"></i> Resume';
+            const isVi = window.wiseApp ? window.wiseApp.getLang() === 'vi' : true;
+            btnPlayPause.innerHTML = isPlaying
+              ? `<i data-lucide="pause" class="w-3.5 h-3.5"></i> <span id="playPauseText" data-i18n="btnPause">${isVi ? 'Tạm Dừng' : 'Pause'}</span>`
+              : `<i data-lucide="play" class="w-3.5 h-3.5"></i> <span id="playPauseText" data-i18n="btnResume">${isVi ? 'Tiếp Tục' : 'Resume'}</span>`;
             lucide.createIcons();
           });
         }
@@ -963,13 +1060,15 @@
         const btnEma = document.getElementById('btnToggleEma');
         if (btnEma) {
           btnEma.addEventListener('click', () => {
-            btnEma.innerText = 'EMA Filter: Edge AI Pipeline';
+            const isVi = window.wiseApp ? window.wiseApp.getLang() === 'vi' : true;
+            btnEma.innerText = isVi ? 'Bộ Lọc EMA: Luồng Edge AI' : 'EMA Filter: Edge AI Pipeline';
           });
         }
         const btnDrift = document.getElementById('btnToggleDrift');
         if (btnDrift) {
           btnDrift.addEventListener('click', () => {
-            btnDrift.innerText = 'Drift Comp: Edge AI Auto';
+            const isVi = window.wiseApp ? window.wiseApp.getLang() === 'vi' : true;
+            btnDrift.innerText = isVi ? 'Bù Trôi (Drift): Tự Động Edge AI' : 'Drift Comp: Edge AI Auto';
           });
         }
         const btnExport = document.getElementById('btnExportCsv');
@@ -981,16 +1080,17 @@
           btnEmail.addEventListener('click', () => {
             const report = this.alarmManager.generateEmailReport();
             const contentEl = document.getElementById('emailReportContent');
+            const isVi = window.wiseApp ? window.wiseApp.getLang() === 'vi' : true;
             if (contentEl) {
               contentEl.innerHTML = `
-  <div><strong class="text-slate-400">To:</strong> ${report.to}</div>
-  <div><strong class="text-slate-400">Subject:</strong> <span class="text-sky-300 ">${report.subject}</span></div>
-  <div><strong class="text-slate-400">Timestamp:</strong> ${report.timestamp}</div>
-  <div><strong class="text-slate-400">Location:</strong> ${report.location}</div>
-  <div><strong class="text-slate-400">Gas:</strong> <span class="text-rose-400 ">${report.targetGas}</span> - ${report.concentrationppm} ppm</div>
-  <div><strong class="text-slate-400">Status:</strong> ${report.riskClassificationHTML}</div>
-  <div><strong class="text-slate-400">Action:</strong> <span class="text-amber-400">${report.requiredAction}</span></div>
-  <div class="mt-2 text-[10px] text-slate-500 border-t border-slate-800 pt-2"><strong class="text-slate-400">Source:</strong> ${report.dispatcherGateway}</div>
+  <div><strong class="text-slate-400">${isVi ? 'Gửi đến:' : 'To:'}</strong> ${report.to}</div>
+  <div><strong class="text-slate-400">${isVi ? 'Tiêu đề:' : 'Subject:'}</strong> <span class="text-sky-300 ">${report.subject}</span></div>
+  <div><strong class="text-slate-400">${isVi ? 'Thời gian:' : 'Timestamp:'}</strong> ${report.timestamp}</div>
+  <div><strong class="text-slate-400">${isVi ? 'Vị trí:' : 'Location:'}</strong> ${report.location}</div>
+  <div><strong class="text-slate-400">${isVi ? 'Khí:' : 'Gas:'}</strong> <span class="text-rose-400 ">${report.targetGas}</span> - ${report.concentrationppm} ppm</div>
+  <div><strong class="text-slate-400">${isVi ? 'Trạng thái:' : 'Status:'}</strong> ${report.riskClassificationHTML}</div>
+  <div><strong class="text-slate-400">${isVi ? 'Hành động:' : 'Action:'}</strong> <span class="text-amber-400">${report.requiredAction}</span></div>
+  <div class="mt-2 text-[10px] text-slate-500 border-t border-slate-800 pt-2"><strong class="text-slate-400">${isVi ? 'Nguồn phát hiện:' : 'Source:'}</strong> ${report.dispatcherGateway}</div>
   `;
             }
             emailModal.classList.remove('hidden');
@@ -1003,15 +1103,22 @@
             emailModal.classList.remove('flex');
           });
         }
+
+        // Language change reactive listener
+        window.addEventListener('appLanguageChanged', () => {
+          this.alarmManager.updateLogTableUI();
+          this.switchMode(this.streamEngine.activeMode);
+        });
       }
       switchMode(modeName) {
         this.chartManager.resetHistory();
         this.streamEngine.setMode(modeName);
+        const isVi = window.wiseApp ? window.wiseApp.getLang() === 'vi' : true;
         const modeLabels = {
-          'fieldScenario': 'Field Industrial Scenario - Auto',
-          'H2SRun': 'H2S Lethal Leak Run - 0 - 10 ppm',
-          'NH3Run': 'NH3 Industrial Run - 0 - 100 ppm',
-          'airRun': 'Clean Air Baseline - Ambient'
+          'fieldScenario': isVi ? 'Kịch Bản Thực Địa - Tự Động' : 'Field Industrial Scenario - Auto',
+          'H2SRun': isVi ? 'Rò Rỉ H2S Nguy Hiểm - 0 - 10 ppm' : 'H2S Lethal Leak Run - 0 - 10 ppm',
+          'NH3Run': isVi ? 'Khí NH3 Công Nghiệp - 0 - 100 ppm' : 'NH3 Industrial Run - 0 - 100 ppm',
+          'airRun': isVi ? 'Không Khí Sạch Chuẩn - Ambient' : 'Clean Air Baseline - Ambient'
         };
         const titleEl = document.getElementById('currentGasTitle');
         if (titleEl) titleEl.innerText = modeLabels[modeName] || modeName;
@@ -1026,6 +1133,7 @@
         console.log(JSON.stringify({ time: packet.timestamp, truegas: packet.trueGas, trueppm: packet.trueppm, predgas: packet.gas, predppm: packet.estimatedppm, raws3: packet.s3Raw, comps3: packet.s3, conf: packet.confidence }));
       }
       updateKpiRow(modelResult, data) {
+        const isVi = window.wiseApp ? window.wiseApp.getLang() === 'vi' : true;
         const ppmVal = document.getElementById('kpippmVal');
         if (ppmVal) ppmVal.innerText = `${modelResult.estimatedppm} ppm`;
         const s3Val = document.getElementById('kpiPeakSensorVal');
@@ -1036,9 +1144,9 @@
           s3Val.innerText = `${modelResult.s3.toFixed(3)} V - ${sign}${slopePct}%/s`;
           if (tteDesc) {
             if (modelResult.prognostics && modelResult.prognostics.timeToEmergencySec) {
-              tteDesc.innerHTML = `<strong class="text-rose-400">TTE: ~${modelResult.prognostics.timeToEmergencySec}s to IDLH</strong>`;
+              tteDesc.innerHTML = `<strong class="text-rose-400">TTE: ~${modelResult.prognostics.timeToEmergencySec}s ${isVi ? 'đến IDLH' : 'to IDLH'}</strong>`;
             } else if (modelResult.gas === 'NH3') {
-              tteDesc.innerText = 'TTE: NH3 Exposure Plateau';
+              tteDesc.innerText = isVi ? 'TTE: Trạng Thái Ổn Định NH3' : 'TTE: NH3 Exposure Plateau';
             } else {
               tteDesc.innerText = `Temp: ${data.temperature}°C | Hum: ${data.humidity}%`;
             }
@@ -1047,11 +1155,11 @@
         const frameVal = document.getElementById('kpiTotalSampleVal');
         if (frameVal) {
           if (modelResult.gas === 'CleanAir' || modelResult.gas === 'Clean Air') {
-            frameVal.innerText = 'Clean Air - Safe';
+            frameVal.innerText = isVi ? 'Không Khí Sạch - An Toàn' : 'Clean Air - Safe';
           } else if (modelResult.gas === 'H2S') {
-            frameVal.innerText = 'H2S Toxic Leak';
+            frameVal.innerText = isVi ? 'Rò Rỉ H2S Độc Hại' : 'H2S Toxic Leak';
           } else if (modelResult.gas === 'NH3') {
-            frameVal.innerText = 'NH3 Irritant Gas';
+            frameVal.innerText = isVi ? 'Khí NH3 Kích Thích' : 'NH3 Irritant Gas';
           } else {
             frameVal.innerText = modelResult.gas;
           }
@@ -1062,11 +1170,20 @@
           rangeVal.innerText = `${proj.toFixed(3)} V`;
         }
         const riskVal = document.getElementById('kpiRiskVal');
-        if (riskVal) riskVal.innerText = modelResult.riskLevel;
+        if (riskVal) {
+          const riskMap = {
+            'Normal': isVi ? 'Bình Thường' : 'Normal',
+            'Warning': isVi ? 'Cảnh Báo' : 'Warning',
+            'Hazardous': isVi ? 'Nguy Hại' : 'Hazardous',
+            'Emergency': isVi ? 'Khẩn Cấp' : 'Emergency'
+          };
+          riskVal.innerText = riskMap[modelResult.riskLevel] || modelResult.riskLevel;
+        }
         const mapeVal = document.getElementById('kpiMapeVal');
-        if (mapeVal) mapeVal.innerText = `${modelResult.confidence}% Confidence`;
+        if (mapeVal) mapeVal.innerText = `${modelResult.confidence}% ${isVi ? 'Độ Tin Cậy' : 'Accuracy'}`;
       }
       handleBannersAndPrognostics(modelResult) {
+        const isVi = window.wiseApp ? window.wiseApp.getLang() === 'vi' : true;
         const badge = document.getElementById('prognosticsBadge');
         const banner = document.getElementById('wiseAlertBanner');
         const bannerText = document.getElementById('alertBannerText');
@@ -1075,19 +1192,19 @@
         if (badge) {
           if (modelResult.prognostics && modelResult.prognostics.isImminentEmergency) {
             badge.className = 'hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded border border-rose-500/50 bg-rose-500/20 text-rose-400 text-[11px]  tracking-wide animate-pulse-alert';
-            badge.innerHTML = `<i data-lucide="triangle-alert" class="w-3.5 h-3.5"></i><span>Incoming Emergency: ~${modelResult.prognostics.timeToEmergencySec}s!</span>`;
+            badge.innerHTML = `<i data-lucide="triangle-alert" class="w-3.5 h-3.5"></i><span>${isVi ? 'Sắp Khẩn Cấp: ~' + modelResult.prognostics.timeToEmergencySec + 's!' : 'Incoming Emergency: ~' + modelResult.prognostics.timeToEmergencySec + 's!'}</span>`;
             lucide.createIcons();
           } else if (modelResult.gas === 'NH3') {
             badge.className = 'hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded border border-violet-500/30 bg-violet-500/10 text-violet-400 text-[11px]  tracking-wide';
-            badge.innerHTML = `<i data-lucide="activity" class="w-3.5 h-3.5"></i><span>NH3 Industrial: ${modelResult.estimatedppm} ppm</span>`;
+            badge.innerHTML = `<i data-lucide="activity" class="w-3.5 h-3.5"></i><span>${isVi ? 'Khí NH3: ' : 'NH3 Industrial: '}${modelResult.estimatedppm} ppm</span>`;
             lucide.createIcons();
           } else if (modelResult.gas === 'H2S' && modelResult.riskLevel !== 'Normal') {
             badge.className = 'hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded border border-amber-500/30 bg-amber-500/10 text-amber-400 text-[11px]  tracking-wide';
-            badge.innerHTML = `<i data-lucide="activity" class="w-3.5 h-3.5"></i><span>H2S Detection: ${modelResult.estimatedppm} ppm</span>`;
+            badge.innerHTML = `<i data-lucide="activity" class="w-3.5 h-3.5"></i><span>${isVi ? 'Phát Hiện H2S: ' : 'H2S Detection: '}${modelResult.estimatedppm} ppm</span>`;
             lucide.createIcons();
           } else {
             badge.className = 'hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[11px]  tracking-wide';
-            badge.innerHTML = `<i data-lucide="activity" class="w-3.5 h-3.5"></i><span>AI Prognostics: Safe Baseline</span>`;
+            badge.innerHTML = `<i data-lucide="activity" class="w-3.5 h-3.5"></i><span>${isVi ? 'Dự Đoán AI: Baseline An Toàn' : 'AI Prognostics: Safe Baseline'}</span>`;
             lucide.createIcons();
           }
         }
@@ -1100,9 +1217,13 @@
             if (alertppm) alertppm.innerText = modelResult.estimatedppm;
             if (bannerText) {
               if (modelResult.prognostics && modelResult.prognostics.isImminentEmergency && modelResult.s3 < 1.65) {
-                bannerText.innerHTML = `<strong class="text-white">Predictive Early Warning:</strong> Runaway ${modelResult.gas} Leak Trajectory Detected! Estimated <strong class="text-white">${modelResult.prognostics.timeToEmergencySec}s</strong> Until IDLH! Isolating Valve V-302!`;
+                bannerText.innerHTML = isVi
+                  ? `<strong class="text-white">Cảnh Báo Sớm:</strong> Phát hiện quỹ đạo rò rỉ ${modelResult.gas}! Ước tính <strong class="text-white">${modelResult.prognostics.timeToEmergencySec}s</strong> đến IDLH! Đang ngắt van V-302!`
+                  : `<strong class="text-white">Predictive Early Warning:</strong> Runaway ${modelResult.gas} Leak Trajectory Detected! Estimated <strong class="text-white">${modelResult.prognostics.timeToEmergencySec}s</strong> Until IDLH! Isolating Valve V-302!`;
               } else {
-                bannerText.innerHTML = `Critical Alarm: <strong class="text-white underline decoration-rose-500 decoration-2">${modelResult.gas}</strong> Leak Detected - <strong class="text-white">${modelResult.estimatedppm}</strong> ppm! Compressor Station Area 1`;
+                bannerText.innerHTML = isVi
+                  ? `Báo Động Khẩn: Phát hiện rò rỉ <strong class="text-white underline decoration-rose-500 decoration-2">${modelResult.gas}</strong> - <strong class="text-white">${modelResult.estimatedppm}</strong> ppm! Khu vực Trạm Máy Nén 1`
+                  : `Critical Alarm: <strong class="text-white underline decoration-rose-500 decoration-2">${modelResult.gas}</strong> Leak Detected - <strong class="text-white">${modelResult.estimatedppm}</strong> ppm! Compressor Station Area 1`;
               }
             }
           } else if (modelResult.riskLevel === 'Hazardous') {
@@ -1110,7 +1231,9 @@
             banner.classList.add('flex');
             banner.className = 'bg-orange-950/40 border border-orange-500/50 rounded p-3 flex-col sm:flex-row items-center justify-between gap-3 shadow-[0_0_15px_rgba(234,88,12,0.15)] flex';
             if (bannerText) {
-              bannerText.innerHTML = `Hazardous Warning: <strong class="text-white">${modelResult.gas}</strong> Exceeded Safe Exposure Limit - ${modelResult.estimatedppm} ppm. Personnel Wear SCBA Masks!`;
+              bannerText.innerHTML = isVi
+                ? `Cảnh Báo Độc Hại: <strong class="text-white">${modelResult.gas}</strong> vượt ngưỡng an toàn - ${modelResult.estimatedppm} ppm. Yêu cầu trang bị mặt nạ SCBA!`
+                : `Hazardous Warning: <strong class="text-white">${modelResult.gas}</strong> Exceeded Safe Exposure Limit - ${modelResult.estimatedppm} ppm. Personnel Wear SCBA Masks!`;
             }
           } else {
             banner.classList.add('hidden');

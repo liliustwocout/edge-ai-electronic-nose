@@ -1,0 +1,246 @@
+/* WISE-IoTSuite Theme Stylesheet (Light / Dark Mode Support) */
+
+:root {
+  --transition-speed: 0.2s;
+  color-scheme: dark;
+}
+
+html.light {
+  color-scheme: light;
+}
+
+/* Base Body Transition */
+body {
+  transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
+}
+
+/* Light Mode Overrides */
+html.light body {
+  background-color: #f8fafc !important;
+  color: #1e293b !important;
+}
+
+/* Scrollbars in Light Mode */
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9 !important;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1 !important;
+  border-radius: 4px;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8 !important;
+}
+
+/* Headers in Light Mode */
+html.light header {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Dark Backgrounds to Light */
+html.light .bg-slate-950,
+html.light .bg-slate-900,
+html.light .bg-slate-900\/50,
+html.light .bg-slate-900\/60,
+html.light .bg-slate-900\/80,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-950\/60,
+html.light .bg-slate-950\/40,
+html.light .bg-\[\#060a12\],
+html.light .bg-\[\#090f1e\]\/90,
+html.light .bg-\[\#090f1f\]\/80,
+html.light .bg-\[\#090f1f\]\/90 {
+  background-color: #ffffff !important;
+}
+
+/* Secondary Backgrounds (Nested boxes, inputs, table rows) */
+html.light .bg-slate-950\/60,
+html.light .bg-slate-950\/40,
+html.light .bg-slate-900\/60 {
+  background-color: #f8fafc !important;
+}
+
+/* Chart container background */
+html.light .chart-container-bg {
+  background: #ffffff !important;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Border Overrides in Light Mode */
+html.light .border-slate-800,
+html.light .border-slate-800\/50,
+html.light .border-slate-800\/60,
+html.light .border-slate-800\/80,
+html.light .border-slate-800\/90,
+html.light .border-slate-700,
+html.light .border-slate-700\/50 {
+  border-color: #e2e8f0 !important;
+}
+
+/* High Contrast Text Colors in Light Mode */
+html.light .text-white {
+  color: #0f172a !important;
+}
+
+html.light .text-slate-200 {
+  color: #1e293b !important;
+}
+
+html.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400 {
+  color: #64748b !important;
+}
+
+html.light .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Button & Action Overrides in Light Mode */
+html.light .bg-slate-800,
+html.light .bg-slate-800\/50,
+html.light .bg-slate-800\/80 {
+  background-color: #f1f5f9 !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+}
+
+html.light .bg-slate-800:hover,
+html.light .bg-slate-800\/80:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+/* KPI Card Tint Overrides in Light Mode */
+html.light .bg-emerald-950\/20,
+html.light .bg-emerald-950\/40,
+html.light .bg-emerald-950\/50 {
+  background-color: #f0fdf4 !important;
+  border-color: #86efac !important;
+}
+html.light .text-emerald-300,
+html.light .text-emerald-400 {
+  color: #059669 !important;
+}
+
+html.light .bg-amber-950\/20,
+html.light .bg-amber-950\/40,
+html.light .bg-amber-950\/50 {
+  background-color: #fffbeb !important;
+  border-color: #fcd34d !important;
+}
+html.light .text-amber-300,
+html.light .text-amber-400 {
+  color: #d97706 !important;
+}
+
+html.light .bg-fuchsia-950\/20,
+html.light .bg-fuchsia-950\/40,
+html.light .bg-fuchsia-950\/50 {
+  background-color: #fdf4ff !important;
+  border-color: #f0abfc !important;
+}
+html.light .text-fuchsia-300,
+html.light .text-fuchsia-400 {
+  color: #c026d3 !important;
+}
+
+html.light .bg-sky-950\/20,
+html.light .bg-sky-950\/40 {
+  background-color: #f0f9ff !important;
+  border-color: #7dd3fc !important;
+}
+html.light .text-sky-300,
+html.light .text-sky-400 {
+  color: #0284c7 !important;
+}
+
+html.light .bg-rose-950\/20,
+html.light .bg-rose-950\/40,
+html.light .bg-rose-950\/50 {
+  background-color: #fff1f2 !important;
+  border-color: #fda4af !important;
+}
+html.light .text-rose-300,
+html.light .text-rose-400 {
+  color: #e11d48 !important;
+}
+
+html.light .bg-teal-950\/20,
+html.light .bg-teal-950\/40 {
+  background-color: #f0fdfa !important;
+  border-color: #5eead4 !important;
+}
+html.light .text-teal-300,
+html.light .text-teal-400 {
+  color: #0d9488 !important;
+}
+
+html.light .bg-purple-950\/20 {
+  background-color: #faf5ff !important;
+  border-color: #d8b4fe !important;
+}
+html.light .text-purple-300 {
+  color: #9333ea !important;
+}
+
+/* Light Table Overrides */
+html.light table thead {
+  background-color: #f8fafc !important;
+  color: #475569 !important;
+}
+html.light table tbody tr:hover {
+  background-color: #f8fafc !important;
+}
+
+/* Select inputs in Light Mode */
+html.light select,
+html.light input {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+}
+
+/* Progress bar track */
+html.light .bg-slate-950 {
+  background-color: #e2e8f0 !important;
+}
+
+/* Email modal */
+html.light #emailModal > div {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+}
+html.light #emailReportContent {
+  background-color: #f8fafc !important;
+  color: #1e293b !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Toggle Switch Styling */
+.theme-lang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+  user-select: none;
+  cursor: pointer;
+}
+
+.theme-lang-btn:hover {
+  transform: translateY(-1px);
+}
+
+.theme-lang-btn:active {
+  transform: translateY(0);
+}
