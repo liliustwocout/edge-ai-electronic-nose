@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, JSONResponse
 from backend.train import extract_window_features, extract_pulse_features, parse_pulse_num
+from backend.calibration import BaselineTracker
 from backend.firebase import FirebaseService
 
 classesPath = 'backend/classes.json'
@@ -28,6 +29,7 @@ if not (os.path.exists(classesPath) and os.path.exists(modelGasPath) and os.path
     trainModel()
 
 firebaseService = FirebaseService()
+baselineTracker = BaselineTracker(warmup_points=20)
 
 app = FastAPI(title="Electronic Nose Edge AI Gateway")
 app.add_middleware(
@@ -39,6 +41,8 @@ app.add_middleware(
 )
 
 app.mount('/dashboard', StaticFiles(directory='dashboard', html=True), name='dashboard')
+if os.path.exists('standee'):
+    app.mount('/standee', StaticFiles(directory='standee', html=True), name='standee')
 
 @app.get('/')
 def getRoot():
@@ -67,14 +71,11 @@ def buildScenarios():
     point_cols = [c for c in airDf.columns if c.startswith('Point_')]
 
     # Pick representative pulses
-    # H2S: 10ppm pulse (Pulse 95)
     h2s_pulse = h2sDf[h2sDf['Pulse_Index'] == 'Pulse_95'][point_cols].values[0].tolist() if 'Pulse_95' in h2sDf['Pulse_Index'].values else h2sDf[point_cols].iloc[-1].values.tolist()
-    # NH3: 50ppm pulse (Pulse 60)
     nh3_pulse = nh3Df[nh3Df['Pulse_Index'] == 'Pulse_60'][point_cols].values[0].tolist() if 'Pulse_60' in nh3Df['Pulse_Index'].values else nh3Df[point_cols].iloc[20].values.tolist()
-    # Air Clean: Pulse 5
     air_pulse = airDf[point_cols].iloc[5].values.tolist()
 
-    # Build sequence for Field Scenario: Baseline (Air) -> H2S Leak (Points 10 to 140) -> Recovery -> NH3 Exposure (Points 10 to 140) -> Purge
+    # Build sequence for Field Scenario: Baseline (Air) -> H2S Leak -> Recovery -> NH3 Exposure -> Purge
     fieldPoints = []
 
     # 1. Baseline Clean Air (25s)
@@ -93,7 +94,6 @@ def buildScenarios():
     # 2. H2S Gas Leak Pulse (0s to 60s)
     for idx, v in enumerate(h2s_pulse):
         noise = float(np.random.normal(0, 0.003))
-        # Concentration increases during exposure then decays
         ppm_est = 10.0 if (20 <= idx <= 125) else (10.0 * (v - 0.5) / 1.7 if v > 0.5 else 0.0)
         fieldPoints.append({
             's3': round(float(v), 4),
@@ -118,35 +118,48 @@ def buildScenarios():
             'phase': 'Safe Baseline'
         })
 
-    # 4. NH3 Industrial Release (0s to 60s)
+    # 4. NH3 Gas Exposure Pulse (0s to 60s)
     for idx, v in enumerate(nh3_pulse):
         noise = float(np.random.normal(0, 0.003))
-        ppm_est = 50.0 if (20 <= idx <= 125) else (50.0 * (v - 0.48) / 1.76 if v > 0.48 else 0.0)
+        ppm_est = 50.0 if (20 <= idx <= 125) else (50.0 * (v - 0.4) / 1.8 if v > 0.4 else 0.0)
         fieldPoints.append({
             's3': round(float(v), 4),
             's3Raw': round(float(v + noise), 4),
-            'temperature': round(29.0 + 0.15 * np.cos(idx * 0.2), 1),
-            'humidity': round(63.8 - 0.1 * np.sin(idx * 0.1), 1),
+            'temperature': round(29.5 + 0.1 * np.cos(idx * 0.15), 1),
+            'humidity': round(63.8 + 0.2 * np.sin(idx * 0.2), 1),
             'trueGas': 'NH3' if idx <= 140 else 'Clean Air',
             'trueppm': round(float(max(0.0, ppm_est)), 1),
-            'phase': 'NH3 Exhaust' if idx <= 130 else 'Ventilation'
+            'phase': 'NH3 Detection' if idx <= 130 else 'Post-Purge Recovery'
+        })
+
+    # 5. Final Clean Air Recovery (25s)
+    for idx, v in enumerate(air_pulse[50:75]):
+        noise = float(np.random.normal(0, 0.002))
+        fieldPoints.append({
+            's3': round(float(v), 4),
+            's3Raw': round(float(v + noise), 4),
+            'temperature': 28.4,
+            'humidity': 64.0,
+            'trueGas': 'Clean Air',
+            'trueppm': 0.0,
+            'phase': 'Baseline Settled'
         })
 
     return {
         'fieldScenario': fieldPoints,
-        'H2SRun': [{
+        'h2sRun': [{
             's3': round(float(v), 4),
             's3Raw': round(float(v + np.random.normal(0, 0.002)), 4),
-            'temperature': 29.4,
+            'temperature': 29.0,
             'humidity': 65.0,
             'trueGas': 'H2S' if idx <= 140 else 'Clean Air',
             'trueppm': 10.0 if (20 <= idx <= 125) else 0.0,
             'phase': 'H2S 10ppm Test'
         } for idx, v in enumerate(h2s_pulse)],
-        'NH3Run': [{
+        'nh3Run': [{
             's3': round(float(v), 4),
             's3Raw': round(float(v + np.random.normal(0, 0.002)), 4),
-            'temperature': 29.1,
+            'temperature': 29.0,
             'humidity': 63.5,
             'trueGas': 'NH3' if idx <= 140 else 'Clean Air',
             'trueppm': 50.0 if (20 <= idx <= 125) else 0.0,
@@ -166,6 +179,30 @@ def buildScenarios():
 scenarios = buildScenarios()
 
 
+def computeRiskLevel(gas, ppmVal, deltaV):
+    """
+    Decoupled risk calculation: evaluates risk based on estimated PPM and differential ΔV.
+    Eliminates false alarms caused by high static outdoor baseline voltages (0.35V - 0.70V).
+    """
+    if gas == 'Clean Air' or abs(deltaV) < 0.08:
+        return 'Normal'
+    if gas == 'H2S':
+        if ppmVal >= 10.0 or deltaV >= 0.55:
+            return 'Emergency'
+        elif ppmVal >= 5.0 or deltaV >= 0.35:
+            return 'Hazardous'
+        elif ppmVal >= 1.0 or deltaV >= 0.12:
+            return 'Warning'
+    elif gas == 'NH3':
+        if ppmVal >= 100.0 or deltaV >= 0.65:
+            return 'Emergency'
+        elif ppmVal >= 50.0 or deltaV >= 0.45:
+            return 'Hazardous'
+        elif ppmVal >= 25.0 or deltaV >= 0.15:
+            return 'Warning'
+    return 'Normal'
+
+
 def runInference(windowValues, compS3):
     tStart = time.perf_counter()
     w = list(windowValues)
@@ -174,7 +211,12 @@ def runInference(windowValues, compS3):
         w = [fillVal] * (20 - len(w)) + w
 
     w_20 = w[-20:]
-    feat = extract_window_features(w_20, base_v=float(compS3))
+    slope = float((w_20[-1] - w_20[0]) / max(len(w_20), 1))
+    v0 = baselineTracker.v0 if baselineTracker.is_calibrated else float(np.median(w_20))
+    deltaV = float(compS3 - v0)
+
+    # Shift-invariant differential feature extraction
+    feat = extract_window_features(w_20, base_v=v0)
     featArr = np.array([feat], dtype=np.float32)
 
     gasProbs = clf_win.predict_proba(featArr)[0]
@@ -185,39 +227,76 @@ def runInference(windowValues, compS3):
 
     estimatedppm = round(float(max(0.0, reg_win.predict(featArr)[0])), 2)
 
-    # Baseline threshold guard
-    if float(compS3) <= 0.32 and predGas != 'Clean Air':
+    # Kinematic Flatness & Slope Guard (Prevents outdoor false alarm)
+    is_flat = baselineTracker.is_flat_baseline(w_20)
+    if is_flat or abs(deltaV) <= 0.05:
         predGas = 'Clean Air'
         estimatedppm = 0.0
-        conf = max(conf, 96)
+        conf = max(conf, 98)
 
+    # Update baseline tracker (adapts slowly in clean air, locks during gas surge)
+    baselineTracker.update(compS3, is_gas_detected=(predGas != 'Clean Air'), slope=slope)
+    v0_updated = baselineTracker.v0
+
+    risk = computeRiskLevel(predGas, estimatedppm, deltaV)
     latencyMs = round((time.perf_counter() - tStart) * 1000, 2)
     return {
         'gas': predGas,
         'confidence': conf,
         'probabilities': probMap,
         'estimatedppm': estimatedppm,
+        'riskLevel': risk,
+        'baseline': round(v0_updated, 4),
+        'delta': round(deltaV, 4),
+        'calibrationState': baselineTracker.state,
         'latencyMs': latencyMs
     }
 
 
-def computeRiskLevel(gas, ppmVal, compVal):
-    risk = 'Normal'
-    if gas == 'H2S':
-        if ppmVal >= 10.0 or compVal >= 0.85:
-            risk = 'Emergency'
-        elif ppmVal >= 5.0 or compVal >= 0.60:
-            risk = 'Hazardous'
-        elif ppmVal >= 1.0 or compVal >= 0.40:
-            risk = 'Warning'
-    elif gas == 'NH3':
-        if ppmVal >= 100.0 or compVal >= 0.95:
-            risk = 'Emergency'
-        elif ppmVal >= 50.0 or compVal >= 0.85:
-            risk = 'Hazardous'
-        elif ppmVal >= 25.0 or compVal >= 0.65:
-            risk = 'Warning'
-    return risk
+def runPulseInference(points):
+    if len(points) != 250:
+        return None
+    tStart = time.perf_counter()
+    base_v = float(np.median(points[:10]))
+    feat = extract_pulse_features(points, base_v=base_v)
+    featArr = np.array([feat], dtype=np.float32)
+
+    probs = clf_pulse.predict_proba(featArr)[0]
+    bestIdx = int(np.argmax(probs))
+    predGas = classes[bestIdx]
+    conf = int(round(float(probs[bestIdx]) * 100))
+    probMap = {classes[i]: round(float(probs[i]), 4) for i in range(len(classes))}
+
+    estimatedppm = round(float(max(0.0, reg_pulse.predict(featArr)[0])), 2)
+    latencyMs = round((time.perf_counter() - tStart) * 1000, 2)
+    deltaV = float(np.max(points) - base_v)
+
+    # Flat baseline check on pulse level
+    if deltaV < 0.08 or float(np.std(points)) < 0.015:
+        predGas = 'Clean Air'
+        estimatedppm = 0.0
+        conf = max(conf, 98)
+
+    risk = computeRiskLevel(predGas, estimatedppm, deltaV)
+
+    return {
+        'gas': predGas,
+        'confidence': conf,
+        'probabilities': probMap,
+        'estimatedppm': estimatedppm,
+        'riskLevel': risk,
+        'latencyMs': latencyMs,
+        'baseline': round(base_v, 4),
+        'delta': round(deltaV, 4),
+        'features': {
+            'min': round(float(np.min(points)), 4),
+            'max': round(float(np.max(points)), 4),
+            'delta': round(deltaV, 4),
+            'auc': round(float(np.sum(points)), 2),
+            'mean': round(float(np.mean(points)), 4),
+            'std': round(float(np.std(points)), 4)
+        }
+    }
 
 
 # =========================================================================
@@ -225,7 +304,7 @@ def computeRiskLevel(gas, ppmVal, compVal):
 # =========================================================================
 @app.get('/health')
 def health():
-    return {'status': 'ok', 'model': 'RandomForest_EdgeAI_DualMode'}
+    return {'status': 'ok', 'model': 'RandomForest_EdgeAI_DualMode_ShiftInvariant'}
 
 @app.get('/api/metrics')
 def getMetrics():
@@ -251,40 +330,6 @@ def getPulseSamples():
             return json.load(f)
     return []
 
-def runPulseInference(points):
-    if len(points) != 250:
-        return None
-    tStart = time.perf_counter()
-    feat = extract_pulse_features(points)
-    featArr = np.array([feat], dtype=np.float32)
-
-    probs = clf_pulse.predict_proba(featArr)[0]
-    bestIdx = int(np.argmax(probs))
-    predGas = classes[bestIdx]
-    conf = int(round(float(probs[bestIdx]) * 100))
-    probMap = {classes[i]: round(float(probs[i]), 4) for i in range(len(classes))}
-
-    estimatedppm = round(float(max(0.0, reg_pulse.predict(featArr)[0])), 2)
-    latencyMs = round((time.perf_counter() - tStart) * 1000, 2)
-    risk = computeRiskLevel(predGas, estimatedppm, np.max(points))
-
-    return {
-        'gas': predGas,
-        'confidence': conf,
-        'probabilities': probMap,
-        'estimatedppm': estimatedppm,
-        'riskLevel': risk,
-        'latencyMs': latencyMs,
-        'features': {
-            'min': round(float(np.min(points)), 4),
-            'max': round(float(np.max(points)), 4),
-            'delta': round(float(np.max(points) - np.min(points)), 4),
-            'auc': round(float(np.sum(points)), 2),
-            'mean': round(float(np.mean(points)), 4),
-            'std': round(float(np.std(points)), 4)
-        }
-    }
-
 @app.post('/api/predict_pulse')
 async def predictPulse(req: Request):
     data = await req.json()
@@ -293,6 +338,29 @@ async def predictPulse(req: Request):
         return JSONResponse({'error': 'Expected 250 points array'}, status_code=400)
     res = runPulseInference(points)
     return res
+
+@app.post('/api/calibrate/zero')
+async def zeroCalibrate(req: Request = None):
+    target_v = None
+    if req:
+        try:
+            body = await req.json()
+            target_v = body.get('targetVoltage')
+        except Exception:
+            pass
+    latest = firebaseService.getLatest()
+    recent = [float(latest.get('voltage1', 0.55))] if latest else None
+    new_v0 = baselineTracker.recalibrate(recent_samples=recent, target_val=target_v)
+    return {
+        'status': 'ok',
+        'baselineVoltage': round(new_v0, 4),
+        'state': baselineTracker.state,
+        'message': f'Zero calibration successful. Baseline anchored at {new_v0:.4f}V.'
+    }
+
+@app.get('/api/calibrate/status')
+def getCalibrateStatus():
+    return baselineTracker.get_status()
 
 @app.get('/api/firebase/status')
 def getFirebaseStatus():
@@ -304,8 +372,6 @@ def getFirebaseLatest():
     if latest:
         v1 = float(latest.get('voltage1', 1.0))
         inf = runInference([v1] * 20, v1)
-        risk = computeRiskLevel(inf['gas'], inf['estimatedppm'], v1)
-        inf['riskLevel'] = risk
         return {
             'telemetry': latest,
             'inference': inf
@@ -355,17 +421,19 @@ async def liveExperimentWs(ws: WebSocket):
                     firebaseService.setAirType(cmd.get('airType', 'CleanAir'))
                 elif action == 'flush':
                     firebaseService.flushDisk()
+                elif action == 'zeroCalibrate':
+                    baselineTracker.recalibrate()
         except Exception:
             pass
 
     listenTask = asyncio.create_task(listenClient())
 
     try:
-        # Send initial connection state
         init_st = firebaseService.getStatus()
         await ws.send_text(json.dumps({
             'type': 'connected',
-            'status': init_st
+            'status': init_st,
+            'calibration': baselineTracker.get_status()
         }))
 
         while True:
@@ -375,7 +443,6 @@ async def liveExperimentWs(ws: WebSocket):
             v2 = float(packet.get('voltage2', 0.0))
 
             cycleSummary = None
-            # Cycle wrap-around detection: e.g. from ~230+ back to <30
             if state['lastPoint'] >= 200 and pt < 30:
                 state['cycleCount'] += 1
                 valid_pts = [p for p in state['cyclePoints'] if p is not None]
@@ -394,8 +461,6 @@ async def liveExperimentWs(ws: WebSocket):
                 state['recentWindow'].pop(0)
 
             win_inf = runInference(state['recentWindow'], v1)
-            risk = computeRiskLevel(win_inf['gas'], win_inf['estimatedppm'], v1)
-            win_inf['riskLevel'] = risk
 
             response = {
                 'type': 'telemetry',
@@ -405,6 +470,9 @@ async def liveExperimentWs(ws: WebSocket):
                 'voltage2': v2,
                 'telemetry': packet,
                 'inference': win_inf,
+                'baseline': win_inf.get('baseline'),
+                'delta': win_inf.get('delta'),
+                'calibrationState': win_inf.get('calibrationState'),
                 'cycleSummary': cycleSummary,
                 'timestamp': packet.get('timestamp')
             }
@@ -416,9 +484,8 @@ async def liveExperimentWs(ws: WebSocket):
         listenTask.cancel()
 
 
-
 # =========================================================================
-# WEBSOCKET STREAMING
+# WEBSOCKET STREAMING & INFERENCE
 # =========================================================================
 @app.websocket('/predict')
 async def predictWs(ws: WebSocket):
@@ -453,22 +520,24 @@ async def streamWs(ws: WebSocket):
                 msg = await ws.receive_text()
                 data = json.loads(msg)
                 action = data.get('action')
-                if action == 'setMode':
-                    newMode = data.get('mode', 'fieldScenario')
-                    if newMode in scenarios:
-                        state['mode'] = newMode
-                        state['index'] = 0
-                        state['window'] = []
-                        state['lastEma'] = None
-                elif action == 'togglePlay':
-                    state['isPlaying'] = not state['isPlaying']
-                elif action == 'pause':
+                if action == 'pause':
                     state['isPlaying'] = False
                 elif action == 'play':
                     state['isPlaying'] = True
+                elif action == 'reset':
+                    state['index'] = 0
+                    state['window'] = []
+                elif action == 'setMode':
+                    m = data.get('mode', 'fieldScenario')
+                    if m in scenarios:
+                        state['mode'] = m
+                        state['index'] = 0
+                        state['window'] = []
                 elif action == 'setSpeed':
                     mult = float(data.get('multiplier', 1.0))
                     state['speedMs'] = max(100, int(800 / mult))
+                elif action == 'zeroCalibrate':
+                    baselineTracker.recalibrate()
         except Exception:
             pass
 
@@ -500,7 +569,7 @@ async def streamWs(ws: WebSocket):
                 inf = runInference(state['window'], compVal)
                 gas = inf['gas']
                 ppmVal = inf['estimatedppm']
-                risk = computeRiskLevel(gas, ppmVal, compVal)
+                risk = inf['riskLevel']
 
                 slopeVal = (state['window'][-1] - state['window'][0]) / max(len(state['window']), 1) if len(state['window']) > 1 else 0.0
                 horizonSteps = [5, 10, 15, 20]
@@ -516,6 +585,9 @@ async def streamWs(ws: WebSocket):
                     'timestamp': time.strftime('%I:%M:%S %p'),
                     's3': round(compVal, 4),
                     's3Raw': round(rawVal, 4),
+                    's3Baseline': inf.get('baseline'),
+                    's3Delta': inf.get('delta'),
+                    'calibrationState': inf.get('calibrationState'),
                     'temperature': temp,
                     'humidity': hum,
                     'trueGas': pt['trueGas'],

@@ -264,6 +264,10 @@ AIoT/
 │   ├── gas_profiles.json              # Dữ liệu đường cong đáp ứng trung bình & độ lệch chuẩn từng loại khí
 │   ├── model_metrics.json             # Chỉ số huấn luyện phục vụ hiển thị trên giao diện
 │   └── pulse_samples.json             # Tập mẫu WaveCycle tiêu biểu dùng cho đối chiếu dạng sóng
+├── standee/
+│   ├── index.html                     # Standee triển lãm 80cm x 180cm (Toolbar zoom, live edit, print to PDF)
+│   ├── style.css                      # CSS thiết kế chuẩn SCADA & in ấn khổ lớn 80x180cm
+│   └── script.js                      # Controller vẽ WaveCycle canvas, tạo QR SVG và lưu LocalStorage
 ├── data/
 │   ├── clean_air_sensor_1.xlsx        # File Excel thô đo Clean Air
 │   ├── air_clean_sensor_1_clean.csv   # Dữ liệu Clean Air sau làm sạch & khử gai (133 pulses)
@@ -305,7 +309,8 @@ python -m backend.train
 python -m uvicorn backend.app:app --host 127.0.0.1 --port 8001
 ```
 
-Truy cập Dashboard: [http://127.0.0.1:8001/dashboard/index.html](http://127.0.0.1:8001/dashboard/index.html)
+Truy cập Dashboard: [http://127.0.0.1:8001/dashboard/index.html](http://127.0.0.1:8001/dashboard/index.html)  
+Truy cập Standee Triển Lãm (80x180cm): [http://127.0.0.1:8001/standee/index.html](http://127.0.0.1:8001/standee/index.html)
 
 ### 2. Triển Khai & Vận Hành Trên Raspberry Pi 3 (Qua Tailscale)
 
@@ -326,6 +331,7 @@ journalctl -u aiot-gateway.service -f        # Xem log thời gian thực
 Mở trình duyệt truy cập trực tiếp từ bất kỳ máy nào trong mạng Tailscale:
 - **Dashboard Vận Hành:** [http://100.72.0.24:8001/dashboard/index.html](http://100.72.0.24:8001/dashboard/index.html)
 - **Thực Nghiệm Phần Cứng:** [http://100.72.0.24:8001/dashboard/experiment.html](http://100.72.0.24:8001/dashboard/experiment.html)
+- **Standee Triển Lãm (80x180cm):** [http://100.72.0.24:8001/standee/index.html](http://100.72.0.24:8001/standee/index.html)
 - **Kiểm Tra Trạng Thái API:** [http://100.72.0.24:8001/health](http://100.72.0.24:8001/health)
 
 *(Xem hướng dẫn đầy đủ tại [docs/DEPLOYMENT_PI3.md](file:///g:/Project/AIoT/docs/DEPLOYMENT_PI3.md) và [docs/OPERATING_SCENARIOS.md](file:///g:/Project/AIoT/docs/OPERATING_SCENARIOS.md))*

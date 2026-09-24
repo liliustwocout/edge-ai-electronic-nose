@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Standee 80x180cm - Edge AI Electronic Nose | Advantech AIoT InnoWorks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- ========================================================================
+       TOP TOOLBAR (QUẢN LÝ ZOOM, SỬA NỘI DUNG, IN STANDEE)
+       ======================================================================== -->
+  <header class="standee-toolbar">
+    <div class="toolbar-brand">
+      <span>ADVANTECH AIoT INNOWORKS</span>
+      <span class="badge">Standee 80cm x 180cm</span>
+    </div>
+
+    <div class="toolbar-actions">
+      <!-- Zoom Controls -->
+      <button class="tb-btn" id="btnFit" title="Tự động co giãn vừa chiều cao màn hình">Vừa màn hình</button>
+      <button class="tb-btn" id="btn50">50%</button>
+      <button class="tb-btn" id="btn75">75%</button>
+      <button class="tb-btn" id="btn100">100% Gốc</button>
+
+      <!-- Live Edit Tools -->
+      <button class="tb-btn" id="btnEdit" title="Nhấp vào chữ bất kỳ để sửa trực tiếp">Chế độ sửa chữ</button>
+      <button class="tb-btn" id="btnSave" title="Lưu các nội dung đã sửa">Lưu sửa đổi</button>
+      <button class="tb-btn" id="btnReset" title="Khôi phục lại nội dung gốc">Khôi phục gốc</button>
+
+      <!-- Print to PDF -->
+      <button class="tb-btn tb-btn-primary" id="btnPrint" title="Xuất file PDF hoặc in standee khổ lớn">In Standee /
+        Xuất PDF</button>
+    </div>
+  </header>
+
+  <!-- ========================================================================
+       STANDEE VIEWPORT & CANVAS (KÍCH THƯỚC CHUẨN TỶ LỆ 80cm x 180cm)
+       ======================================================================== -->
+  <main class="standee-viewport" id="standeeViewport">
+    <article class="standee-canvas" id="standeeCanvas">
+      <div class="standee-content">
+
+        <!-- --------------------------------------------------------------------
+             PHÂN KHỐI 1: HEADER & ĐƠN VỊ THỰC HIỆN
+             -------------------------------------------------------------------- -->
+        <section class="header-section">
+          <div class="header-logos">
+            <!-- Advantech Logo Vector -->
+            <div class="logo-advantech">
+              <svg width="34" height="34" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="100" height="100" rx="8" fill="#004B87" />
+                <path d="M50 15L85 80H68L50 45L32 80H15L50 15Z" fill="#FFFFFF" />
+                <circle cx="50" cy="65" r="10" fill="#0284C7" />
+              </svg>
+              <div>
+                <div class="advantech-text">ADVANTECH</div>
+                <div class="advantech-sub">Enabling an Intelligent Planet</div>
+              </div>
+            </div>
+
+            <!-- Competition Badge -->
+            <div class="logo-competition">
+              <span class="comp-title">Advantech AIoT InnoWorks 2026</span>
+            </div>
+          </div>
+
+          <!-- Main Title -->
+          <div class="header-title-block">
+            <h1 class="title-en">EDGE AI-BASED ELECTRONIC NOSE<br>FOR TOXIC GAS DETECTION IN INDUSTRIAL PLANTS</h1>
+            <h2 class="title-vi">Hệ Thống Mũi Điện Tử Ứng Dụng Trí Tuệ Nhân Tạo Biên Cảnh Báo Sớm Rò Rỉ Khí Độc Trong
+              Nhà Máy Công Nghiệp</h2>
+            <div class="slogan-pill">
+              Chuyển dịch từ Đo Lường Ngưỡng Tĩnh sang Nhận diện Động học Khí Biên (WaveCycle Kinetics)
+            </div>
+          </div>
+
+          <!-- Metadata Bar -->
+          <div class="header-meta">
+            <div class="meta-item">Đơn vị: <strong>Trường Đại học Phenikaa</strong></div>
+            <div class="meta-item">Đội thi: <strong>TaskForce141</strong></div>
+            <div class="meta-item">GVHD: <strong>TS. Nguyễn Đắc Cử</strong></div>
+            <div class="meta-item">Thành viên: <strong>Đỗ Đức Khôi (Leader) | Lê Phạm Thành Đạt | Vũ Anh Kiệt</strong></div>
+          </div>
+        </section>
+
+        <!-- --------------------------------------------------------------------
+             PHÂN KHỐI 2: THÁCH THỨC CÔNG NGHIỆP VS ĐỘT PHÁ CÔNG NGHỆ E-NOSE
+             -------------------------------------------------------------------- -->
+        <section class="problem-solution-grid">
+          <!-- Problem Box -->
+          <div class="card problem-box">
+            <div class="section-title-box">
+              <span class="section-title">Thách Thức Cảm Biến Truyền Thống</span>
+              <span class="section-tag">HIỆN TRẠNG</span>
+            </div>
+            <ul class="bullet-list">
+              <li>
+                <span class="bullet-index">[1]</span>
+                <div><strong>Khí kịch độc H₂S và NH₃:</strong> Gây tê liệt khứu giác ở 10 ppm, tử vong nhanh chóng ở mức
+                  trên 50 ppm (ngưỡng IDLH), gây ăn mòn đường ống và nguy cơ cháy nổ.</div>
+              </li>
+              <li>
+                <span class="bullet-index">[2]</span>
+                <div><strong>Đo ngưỡng tĩnh và Báo động muộn:</strong> Đầu dò cũ chỉ phát tín hiệu khi khí đã khuếch tán
+                  diện rộng, không kịp cô lập tuyến ống rò rỉ.</div>
+              </li>
+              <li>
+                <span class="bullet-index">[3]</span>
+                <div><strong>Báo động giả (False Alarms):</strong> Hiện tượng nhạy chéo với độ ẩm, nhiệt độ và khói nền
+                  máy nén khiến dây chuyền dừng đột ngột, gây thiệt hại lớn.</div>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Solution Box -->
+          <div class="card solution-box">
+            <div class="section-title-box">
+              <span class="section-title">Đột Phá Mũi Điện Tử Edge AI</span>
+              <span class="section-tag">GIẢI PHÁP</span>
+            </div>
+            <ul class="bullet-list">
+              <li>
+                <span class="bullet-index">[1]</span>
+                <div><strong>Mảng cảm biến (Sensor Array):</strong> Tích hợp MQ136/ZE03 (H₂S), MQ135 (NH₃/VOCs) và DHT22
+                  mô phỏng cơ chế khứu giác sinh học.</div>
+              </li>
+              <li>
+                <span class="bullet-index">[2]</span>
+                <div><strong>Dấu vân tay mùi khí (Gas Fingerprint):</strong> Khai thác chu kỳ sóng 60 giây (WaveCycle
+                  250 điểm) để bóc tách chính xác từng loại khí nguy hại.</div>
+              </li>
+              <li>
+                <span class="bullet-index">[3]</span>
+                <div><strong>Dự báo trước xu hướng (+20s):</strong> Thuật toán vận tốc dốc khí (Velocity Slope) phát
+                  hiện và cảnh báo đón đầu ngay từ giai đoạn bốc thoát vi mô.</div>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- --------------------------------------------------------------------
+             PHÂN KHỐI 3: KIẾN TRÚC HỆ THỐNG 5 TẦNG CÔNG NGHIỆP
+             -------------------------------------------------------------------- -->
+        <section class="card">
+          <div class="section-title-box">
+            <span class="section-title">Kiến Trúc Hệ Thống 5 Tầng Chuẩn Công Nghiệp (5-Layer AIoT)</span>
+            <span class="section-tag">SCADA SCALABILITY</span>
+          </div>
+
+          <!-- Sơ Đồ Kiến Trúc Trực Quan Bằng Hình Ảnh -->
+          <div class="arch-image-wrapper">
+            <img src="architecture_5_layers.jpg" alt="Sơ Đồ Kiến Trúc Hệ Thống 5 Tầng AIoT Công Nghiệp"
+              class="arch-image">
+          </div>
+        </section>
+
+        <!-- --------------------------------------------------------------------
+             PHÂN KHỐI 4: HIỆU NĂNG MÔ HÌNH EDGE AI (HIGHLIGHT KPIS)
+             -------------------------------------------------------------------- -->
+        <section>
+          <div class="kpi-row">
+            <div class="kpi-card">
+              <div class="kpi-value primary">94.71%</div>
+              <div class="kpi-label">Accuracy Phân Loại</div>
+              <div class="kpi-sub">Window Streaming Model</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-value green">3.93 ppm</div>
+              <div class="kpi-label">Sai Số Nồng Độ MAE</div>
+              <div class="kpi-sub">Pulse Model (Chu kỳ 60s)</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-value amber">0.8534</div>
+              <div class="kpi-label">Hệ Số Tương Quan R²</div>
+              <div class="kpi-sub">Hồi quy định lượng nồng độ</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-value primary">1.5 - 3.2 ms</div>
+              <div class="kpi-label">Độ Trễ Suy Luận</div>
+              <div class="kpi-sub">Chạy mượt trên RPi 3/5</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- --------------------------------------------------------------------
+             PHÂN KHỐI 5: DAO ĐỘNG KÝ WAVECYCLE & PHÂN CẤP AN TOÀN 4 MỨC
+             -------------------------------------------------------------------- -->
+        <section class="card">
+          <div class="section-title-box">
+            <span class="section-title">WaveCycle Oscilloscope 250 Điểm và Phân Cấp An Toàn 4 Cấp Độ</span>
+            <span class="section-tag">OSHA / NIOSH COMPLIANT</span>
+          </div>
+
+          <div class="oscilloscope-container">
+            <!-- Canvas Graph -->
+            <div class="chart-wrapper">
+              <div class="chart-header">
+                <span>WAVECYCLE REAL-TIME OSCILLOSCOPE [250 PTS / 60S]</span>
+                <span style="color: var(--ad-primary);">LIVE SWEEP OVERWRITE</span>
+              </div>
+              <canvas id="waveCanvas" class="canvas-chart"></canvas>
+              <div class="chart-legend">
+                <div class="legend-row">
+                  <div class="legend-item"><span class="legend-line" style="background: #059669;"></span> Clean Air
+                    Baseline (0 ppm)</div>
+                  <div class="legend-item"><span class="legend-line" style="background: #d97706;"></span> NH₃ Gas
+                    Response (100 ppm)</div>
+                </div>
+                <div class="legend-row">
+                  <div class="legend-item"><span class="legend-line" style="background: #dc2626;"></span> H₂S Lethal
+                    Peak (10 ppm)</div>
+                  <div class="legend-item"><span class="legend-line"
+                      style="background: #64748b; border: 1px dashed #64748b;"></span> Ghost Trace (Chu kỳ trước)</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Risk Level Table -->
+            <div class="risk-table-box">
+              <div class="risk-level-row lvl-normal">
+                <span class="risk-badge">CẤP 1: NORMAL</span>
+                <span>H₂S &lt; 1 ppm<br>NH₃ &lt; 25 ppm</span>
+                <span>An toàn, giám sát định kỳ bình thường</span>
+              </div>
+              <div class="risk-level-row lvl-warning">
+                <span class="risk-badge">CẤP 2: WARNING</span>
+                <span>H₂S: 1 - 4.9 ppm<br>NH₃: 25 - 49.9 ppm</span>
+                <span>Cảnh báo rò rỉ sớm, thông báo ca trực</span>
+              </div>
+              <div class="risk-level-row lvl-hazardous">
+                <span class="risk-badge">CẤP 3: HAZARDOUS</span>
+                <span>H₂S: 5 - 9.9 ppm<br>NH₃: 50 - 99.9 ppm</span>
+                <span>Vượt OSHA PEL, kích hoạt đèn chớp và bảo hộ</span>
+              </div>
+              <div class="risk-level-row lvl-emergency">
+                <span class="risk-badge">CẤP 4: EMERGENCY</span>
+                <span>H₂S &ge; 10 ppm<br>NH₃ &ge; 100 ppm</span>
+                <span>Nguy hiểm IDLH, còi hú, đóng van tự động</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- --------------------------------------------------------------------
+             PHÂN KHỐI 6: ĐẶC TRƯNG QUAN TRỌNG & BÁO CÁO PHÂN LỚP
+             -------------------------------------------------------------------- -->
+        <section class="feature-verify-grid">
+          <!-- Top Features -->
+          <div class="card">
+            <div class="section-title-box">
+              <span class="section-title" style="font-size: 13.5px;">Top Đặc Trưng Quyết Định (Feature
+                Importance)</span>
+              <span class="section-tag">EXPLAINABLE AI</span>
+            </div>
+            <div class="feature-bars">
+              <div class="feature-item">
+                <div class="feature-meta"><span>Delta_V (Vmax - Vmin)</span><span>12.63%</span></div>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: 100%;"></div>
+                </div>
+              </div>
+              <div class="feature-item">
+                <div class="feature-meta"><span>Anchor_18s (Đỉnh sườn tăng H₂S)</span><span>10.17%</span></div>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: 80%;"></div>
+                </div>
+              </div>
+              <div class="feature-item">
+                <div class="feature-meta"><span>Peak_Time (Thời gian đạt đỉnh)</span><span>8.64%</span></div>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: 68%;"></div>
+                </div>
+              </div>
+              <div class="feature-item">
+                <div class="feature-meta"><span>Decay_Slope (Tốc độ giải hấp phụ)</span><span>8.43%</span></div>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: 66%;"></div>
+                </div>
+              </div>
+              <div class="feature-item">
+                <div class="feature-meta"><span>Anchor_55s (Khả năng hồi phục)</span><span>6.64%</span></div>
+                <div class="bar-track">
+                  <div class="bar-fill" style="width: 52%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Classification Verification -->
+          <div class="card">
+            <div class="section-title-box">
+              <span class="section-title" style="font-size: 13.5px;">Báo Cáo Phân Lớp (Zero-Overlap 5-Fold CV)</span>
+              <span class="section-tag">361 PULSES</span>
+            </div>
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th>Loại Khí</th>
+                  <th>Precision</th>
+                  <th>Recall</th>
+                  <th>F1-Score</th>
+                  <th>Mẫu</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Clean Air</strong></td>
+                  <td>89.7%</td>
+                  <td style="color: #166534; font-weight: 700;">98.5%</td>
+                  <td>93.9%</td>
+                  <td>133</td>
+                </tr>
+                <tr>
+                  <td><strong>Khí H₂S</strong></td>
+                  <td style="color: var(--ad-primary); font-weight: 700;">96.0%</td>
+                  <td>86.4%</td>
+                  <td>90.9%</td>
+                  <td>110</td>
+                </tr>
+                <tr>
+                  <td><strong>Khí NH₃</strong></td>
+                  <td style="color: #b45309; font-weight: 700;">98.3%</td>
+                  <td style="color: #b45309; font-weight: 700;">96.6%</td>
+                  <td style="color: #b45309; font-weight: 700;">97.4%</td>
+                  <td>118</td>
+                </tr>
+                <tr style="font-weight: 800; border-top: 2px solid var(--border-strong);">
+                  <td>Trung Bình</td>
+                  <td>94.4%</td>
+                  <td>94.2%</td>
+                  <td>94.1%</td>
+                  <td>361</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- --------------------------------------------------------------------
+             PHÂN KHỐI 7: 4 ĐẶC TÍNH CỐT LÕI ĐỘC BẢN (KEY DIFFERENTIATORS)
+             -------------------------------------------------------------------- -->
+        <section class="usp-grid">
+          <div class="usp-card">
+            <div class="usp-num">01. BASELINE GUARD</div>
+            <div class="usp-title">Chốt Chặn Chống Ảo</div>
+            <div class="usp-desc">Cơ chế tự động khóa 100% báo động giả khi điện áp Vcomp nhỏ hơn 0.32V, bảo vệ độ tin
+              cậy hệ thống.</div>
+          </div>
+          <div class="usp-card">
+            <div class="usp-num">02. GRADIENT HORIZON</div>
+            <div class="usp-title">Dự Báo Sớm +20 Giây</div>
+            <div class="usp-desc">Tính toán độ dốc biến thiên Velocity Slope để cảnh báo đón đầu trước khi nồng độ chạm
+              ngưỡng tử vong.</div>
+          </div>
+          <div class="usp-card">
+            <div class="usp-num">03. FAIL-SAFE RESILIENCE</div>
+            <div class="usp-title">100% Offline</div>
+            <div class="usp-desc">Gateway tự lưu trữ SQLite và kích hoạt còi đèn, đóng van khẩn cấp tại chỗ ngay cả khi
+              đứt cáp mạng.</div>
+          </div>
+          <div class="usp-card">
+            <div class="usp-num">04. WISE-IOT READY</div>
+            <div class="usp-title">Đồng Bộ Đám Mây</div>
+            <div class="usp-desc">Đóng gói chuẩn MQTT kết nối hệ sinh thái Advantech WISE-IoT, giám sát tập trung đa
+              phân xưởng.</div>
+          </div>
+        </section>
+
+        <!-- --------------------------------------------------------------------
+             PHÂN KHỐI 8: FOOTER, LOGO TRƯỜNG ĐẠI HỌC PHENIKAA & ĐƠN VỊ ĐỒNG HÀNH
+             -------------------------------------------------------------------- -->
+        <footer class="footer-section">
+          <!-- Logo Trường Đại học Phenikaa -->
+          <div class="institution-logo-box">
+            <img src="phenikaa_logo.png" alt="Trường Đại học Phenikaa - Phenikaa University" class="phenikaa-logo">
+          </div>
+
+          <!-- Team & Project Credits -->
+          <div class="footer-info">
+            <h4>TRƯỜNG ĐẠI HỌC PHENIKAA - PHENIKAA UNIVERSITY</h4>
+            <div>Dự án nghiên cứu &amp; chế tạo bởi <strong>TaskForce141</strong> | Cuộc thi <strong>Advantech AIoT InnoWorks 2026</strong></div>
+            <div class="team-list">
+              <span>Đỗ Đức Khôi (Leader)</span>
+              <span>|</span>
+              <span>Lê Phạm Thành Đạt</span>
+              <span>|</span>
+              <span>Vũ Anh Kiệt</span>
+            </div>
+            <div style="font-size: 10px; color: var(--text-muted); margin-top: 2px;">
+              Khoa Điện - Điện Tử / Viện Kỹ Thuật Công Nghệ Cao | Giảng viên hướng dẫn: TS. Nguyễn Đắc Cử
+            </div>
+          </div>
+
+          <!-- Advantech Partner Stamp -->
+          <div class="footer-advantech-tag">
+            <div class="partner-logo-text">ADVANTECH</div>
+            <div class="partner-desc">Enabling an Intelligent Planet</div>
+            <div style="font-size: 9.5px; color: var(--ad-primary); font-weight: 700; margin-top: 3px;">AIoT INNOWORKS DEVELOPER</div>
+          </div>
+        </footer>
+
+      </div>
+    </article>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+
+</html>

@@ -109,10 +109,22 @@
         <i data-lucide="flask-conical" class="w-3.5 h-3.5 text-sky-400"></i>
         <span data-i18n="navExperiment">Thực Nghiệm Realtime</span>
       </a>
+      <a href="/standee/index.html" target="_blank"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 text-xs font-medium transition-all shadow-[0_0_12px_rgba(245,158,11,0.25)]">
+        <i data-lucide="presentation" class="w-3.5 h-3.5 text-amber-400"></i>
+        <span>Standee 80x180cm</span>
+      </a>
       <div id="prognosticsBadge"
         class="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-[11px]  tracking-wide">
         <i data-lucide="activity" class="w-3.5 h-3.5"></i>
         <span data-i18n="prognosticsSafe">AI Prognostics: Safe Baseline</span>
+      </div>
+      <div id="baselineBadgeIndex"
+        class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[11px] font-mono"
+        title="Đường nền tham chiếu V0 & Độ lệch vi sai ΔV (Outdoor Drift Compensation)">
+        <span>V₀: <strong id="idxBaselineVal" class="text-amber-200">0.000V</strong></span>
+        <span class="text-slate-500">|</span>
+        <span>ΔV: <strong id="idxDeltaVal" class="text-sky-300">+0.000V</strong></span>
       </div>
       <div id="wiseClock"
         class="text-[11px] text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded border border-slate-800 font-mono">
@@ -163,6 +175,12 @@
         <button id="btnToggleDrift"
           class="px-3 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 text-xs whitespace-nowrap"
           data-i18n="driftCompOn">Bù Trôi (Drift): Bật</button>
+        <button id="btnZeroCalibrateIndex"
+          class="px-3 py-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs whitespace-nowrap flex items-center gap-1 font-medium transition-all shadow-sm active:scale-95"
+          title="Cân chỉnh đường nền ngoài trời (Zero Calibration)">
+          <i data-lucide="crosshair" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span id="zeroCalTextIndex">Zero Calibrate</span>
+        </button>
         <button id="btnPlayPause"
           class="px-3 py-1.5 rounded bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 text-xs whitespace-nowrap flex items-center gap-1"><i
             data-lucide="pause" class="w-3.5 h-3.5"></i> <span id="playPauseText" data-i18n="btnPause">Tạm
@@ -1100,6 +1118,44 @@
             btnDrift.innerText = isVi ? 'Bù Trôi (Drift): Tự Động Edge AI' : 'Drift Comp: Edge AI Auto';
           });
         }
+
+        // Zero Calibrate Handler
+        const btnZeroIdx = document.getElementById('btnZeroCalibrateIndex');
+        if (btnZeroIdx) {
+          btnZeroIdx.addEventListener('click', async () => {
+            const labelEl = document.getElementById('zeroCalTextIndex');
+            const origText = labelEl ? labelEl.innerText : 'Zero Calibrate';
+            if (labelEl) labelEl.innerText = 'Calibrating...';
+            btnZeroIdx.classList.add('opacity-50', 'pointer-events-none');
+            try {
+              if (this.streamEngine.ws && this.streamEngine.ws.readyState === WebSocket.OPEN) {
+                this.streamEngine.ws.send(JSON.stringify({ action: 'zeroCalibrate' }));
+              }
+              const resp = await fetch('/api/calibrate/zero', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+              });
+              const res = await resp.json();
+              if (labelEl) labelEl.innerText = 'Calibrated! 🎯';
+              const baseEl = document.getElementById('idxBaselineVal');
+              if (baseEl && res.baselineVoltage !== undefined) {
+                baseEl.innerText = `${parseFloat(res.baselineVoltage).toFixed(3)}V`;
+              }
+              setTimeout(() => {
+                if (labelEl) labelEl.innerText = origText;
+                btnZeroIdx.classList.remove('opacity-50', 'pointer-events-none');
+              }, 2000);
+            } catch (err) {
+              console.error('Zero calibration error:', err);
+              if (labelEl) labelEl.innerText = 'Failed';
+              setTimeout(() => {
+                if (labelEl) labelEl.innerText = origText;
+                btnZeroIdx.classList.remove('opacity-50', 'pointer-events-none');
+              }, 2000);
+            }
+          });
+        }
+
         const btnExport = document.getElementById('btnExportCsv');
         if (btnExport) btnExport.addEventListener('click', () => this.alarmManager.exportLogsCsv());
         const btnEmail = document.getElementById('btnEmailPreview');
@@ -1154,6 +1210,15 @@
       }
       onTelemetryReceived(packet) {
         this.frameCount++;
+        const baseEl = document.getElementById('idxBaselineVal');
+        const deltaEl = document.getElementById('idxDeltaVal');
+        const baseVal = packet.s3Baseline !== undefined ? packet.s3Baseline : (packet.inference && packet.inference.baseline !== undefined ? packet.inference.baseline : 0.0);
+        const deltaVal = packet.s3Delta !== undefined ? packet.s3Delta : (packet.s3 - baseVal);
+        if (baseEl && baseVal !== undefined) baseEl.innerText = `${parseFloat(baseVal).toFixed(3)}V`;
+        if (deltaEl && deltaVal !== undefined) {
+          deltaEl.innerText = `${deltaVal >= 0 ? '+' : ''}${parseFloat(deltaVal).toFixed(3)}V`;
+          deltaEl.className = Math.abs(deltaVal) > 0.15 ? 'text-rose-400 font-bold' : 'text-sky-300 font-bold';
+        }
         this.alarmManager.evaluateState(packet, packet);
         this.updateKpiRow(packet, packet);
         this.chartManager.updateCharts(packet, packet.timestamp);

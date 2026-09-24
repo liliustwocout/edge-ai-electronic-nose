@@ -1,0 +1,800 @@
+/* ==========================================================================
+   STANDEE STYLING - ADVANTECH AIoT INNOWORKS (80cm x 180cm)
+   Theme: Clean Light Exhibition (Học thuật, Tông Sáng, Không Icon/Emoji)
+   Scale: Tỷ lệ 80:180 (4:9) -> Khổ cơ sở 840px x 1890px
+   ========================================================================== */
+
+:root {
+  /* Brand Advantech & Industrial Light Palette */
+  --ad-primary: #004b87;     /* Advantech Deep Corporate Blue */
+  --ad-blue: #0284c7;        /* Tech Blue Accent */
+  --ad-cyan: #0070ba;        /* Advantech Cyan Deep */
+  --ad-dark: #0f172a;        /* Deep Slate for Headers */
+
+  /* Academic Light Theme Palette */
+  --bg-app: #e2e8f0;
+  --bg-standee: #ffffff;
+  --bg-section: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-card-alt: #f1f5f9;
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --border-focus: #0284c7;
+
+  /* Typography Colors */
+  --text-main: #0f172a;
+  --text-body: #334155;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --text-primary: #004b87;
+
+  /* SCADA Risk Levels (Light Contrast Compliant) */
+  --risk-normal-bg: #ecfdf5;
+  --risk-normal-border: #10b981;
+  --risk-normal-text: #065f46;
+
+  --risk-warning-bg: #fffbeb;
+  --risk-warning-border: #f59e0b;
+  --risk-warning-text: #92400e;
+
+  --risk-hazardous-bg: #fff7ed;
+  --risk-hazardous-border: #f97316;
+  --risk-hazardous-text: #9a3412;
+
+  --risk-emergency-bg: #fef2f2;
+  --risk-emergency-border: #ef4444;
+  --risk-emergency-text: #991b1b;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 4px 12px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-app);
+  color: var(--text-body);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80px 20px 40px 20px;
+  overflow-x: auto;
+}
+
+/* --------------------------------------------------------------------------
+   TOOLBAR (CONTROL PANEL) - CLEAN LIGHT STYLE
+   -------------------------------------------------------------------------- */
+.standee-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px;
+  z-index: 9999;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.toolbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ad-primary);
+  letter-spacing: 0.5px;
+}
+
+.toolbar-brand .badge {
+  background: #e0f2fe;
+  color: var(--ad-primary);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  border: 1px solid #bae6fd;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tb-btn {
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid var(--border-strong);
+  padding: 6px 13px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tb-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.tb-btn.active {
+  background: #0284c7;
+  color: #ffffff;
+  border-color: #0284c7;
+}
+
+.tb-btn-primary {
+  background: var(--ad-primary);
+  color: #ffffff;
+  border: 1px solid var(--ad-primary);
+  font-weight: 700;
+}
+
+.tb-btn-primary:hover {
+  background: #003660;
+  border-color: #003660;
+  color: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   STANDEE CONTAINER (80cm x 180cm -> 840px x 1890px)
+   -------------------------------------------------------------------------- */
+.standee-viewport {
+  transition: transform 0.2s ease;
+  transform-origin: top center;
+  margin-top: 10px;
+}
+
+.standee-canvas {
+  width: 840px;
+  min-height: 1890px;
+  background-color: var(--bg-standee);
+  position: relative;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px #cbd5e1;
+  padding: 36px 36px 28px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.standee-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   SHARED UI BLOCKS & HEADERS
+   -------------------------------------------------------------------------- */
+.section-title-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 2px solid var(--border-strong);
+  padding-bottom: 6px;
+  margin-bottom: 10px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--ad-primary);
+}
+
+.section-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: var(--ad-primary);
+  padding: 2px 7px;
+  border-radius: 3px;
+  border: 1px solid #cbd5e1;
+  letter-spacing: 0.4px;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 14px;
+  box-shadow: var(--shadow-card);
+}
+
+/* Live Edit Highlight */
+body.edit-mode [contenteditable="true"] {
+  outline: 2px dashed #0284c7;
+  outline-offset: 3px;
+  cursor: text;
+}
+body.edit-mode [contenteditable="true"]:hover {
+  background: #f0f9ff;
+}
+
+/* --------------------------------------------------------------------------
+   SECTION 1: HEADER & IDENTITY
+   -------------------------------------------------------------------------- */
+.header-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-bottom: 2px solid var(--ad-primary);
+  padding-bottom: 14px;
+}
+
+.header-logos {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+}
+
+.logo-advantech {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.advantech-text {
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 1.5px;
+  color: var(--ad-primary);
+}
+
+.advantech-sub {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-top: -3px;
+}
+
+.logo-competition {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid var(--border-strong);
+  padding: 6px 14px;
+  border-radius: 4px;
+}
+
+.comp-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ad-primary);
+  letter-spacing: 0.5px;
+}
+
+.header-title-block {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title-en {
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 1.25;
+  color: #0f172a;
+  letter-spacing: 0.5px;
+}
+
+.title-vi {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--ad-primary);
+  line-height: 1.35;
+}
+
+.slogan-pill {
+  align-self: center;
+  display: inline-block;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: var(--ad-primary);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 4px 14px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.header-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 8px 14px;
+  font-size: 11.5px;
+  color: var(--text-body);
+}
+
+.meta-item strong {
+  color: var(--ad-primary);
+}
+
+/* --------------------------------------------------------------------------
+   SECTION 2: PROBLEM VS SOLUTION (DUAL COLUMNS) - NEUTRAL THEME
+   -------------------------------------------------------------------------- */
+.problem-solution-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.problem-box,
+.solution-box {
+  background: #ffffff;
+  border: 1px solid var(--border-strong);
+  border-top: 3px solid var(--ad-primary);
+}
+
+.problem-box .section-title,
+.solution-box .section-title {
+  color: var(--ad-primary);
+}
+
+.bullet-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.bullet-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-body);
+}
+
+.bullet-list li strong {
+  color: #0f172a;
+}
+
+.bullet-index {
+  font-weight: 800;
+  color: var(--ad-primary);
+  flex-shrink: 0;
+  min-width: 18px;
+}
+
+/* --------------------------------------------------------------------------
+   SECTION 3: 5-LAYER INDUSTRIAL ARCHITECTURE (IMAGE & STRIP)
+   -------------------------------------------------------------------------- */
+.arch-image-wrapper {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 8px;
+}
+
+.arch-image {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+.arch-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+}
+
+.arch-summary-item {
+  background: var(--bg-card-alt);
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  padding: 6px 8px;
+  font-size: 10px;
+  color: var(--text-body);
+  line-height: 1.35;
+}
+
+.arch-summary-item strong {
+  display: block;
+  color: var(--ad-primary);
+  font-size: 10.5px;
+  margin-bottom: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   SECTION 4: EDGE AI HIGHLIGHT KPIS
+   -------------------------------------------------------------------------- */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.kpi-card {
+  background: #ffffff;
+  border: 1px solid var(--border-strong);
+  border-top: 3px solid var(--ad-primary);
+  border-radius: 4px;
+  padding: 10px 6px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  box-shadow: var(--shadow-sm);
+}
+
+.kpi-value {
+  font-size: 23px;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.5px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.kpi-value.primary { color: var(--ad-primary); }
+.kpi-value.green { color: #166534; }
+.kpi-value.amber { color: #b45309; }
+
+.kpi-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #0f172a;
+  text-transform: uppercase;
+}
+
+.kpi-sub {
+  font-size: 9px;
+  color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   SECTION 5: WAVECYCLE OSCILLOSCOPE GRAPH & 4 RISK LEVELS
+   -------------------------------------------------------------------------- */
+.oscilloscope-container {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 12px;
+}
+
+.chart-wrapper {
+  background: #ffffff;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 10.5px;
+  color: #0f172a;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: 4px;
+}
+
+.canvas-chart {
+  width: 100%;
+  height: 190px;
+  display: block;
+}
+
+.chart-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 9.5px;
+  color: var(--text-body);
+  font-family: 'JetBrains Mono', monospace;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 4px;
+}
+
+.legend-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  border-radius: 1px;
+}
+
+/* 4 Safety Levels Table (Clean Light) */
+.risk-table-box {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.risk-level-row {
+  display: grid;
+  grid-template-columns: 85px 85px 1fr;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  border-left: 4px solid transparent;
+}
+
+.risk-level-row.lvl-normal {
+  background: var(--risk-normal-bg);
+  border-color: var(--risk-normal-border);
+  color: var(--risk-normal-text);
+}
+.risk-level-row.lvl-warning {
+  background: var(--risk-warning-bg);
+  border-color: var(--risk-warning-border);
+  color: var(--risk-warning-text);
+}
+.risk-level-row.lvl-hazardous {
+  background: var(--risk-hazardous-bg);
+  border-color: var(--risk-hazardous-border);
+  color: var(--risk-hazardous-text);
+}
+.risk-level-row.lvl-emergency {
+  background: var(--risk-emergency-bg);
+  border-color: var(--risk-emergency-border);
+  color: var(--risk-emergency-text);
+}
+
+.risk-badge {
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 9.5px;
+}
+
+/* --------------------------------------------------------------------------
+   SECTION 6: FEATURE IMPORTANCE & CLASSIFICATION STATS
+   -------------------------------------------------------------------------- */
+.feature-verify-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.feature-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.feature-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.feature-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.bar-track {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: var(--ad-primary);
+  border-radius: 3px;
+}
+
+/* Clean Academic Data Table */
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+  text-align: center;
+}
+
+.report-table th {
+  background: #f1f5f9;
+  color: #0f172a;
+  padding: 5px;
+  font-weight: 700;
+  border-bottom: 2px solid var(--border-strong);
+}
+
+.report-table td {
+  padding: 5px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-body);
+}
+
+/* --------------------------------------------------------------------------
+   SECTION 7: 4 KEY DIFFERENTIATORS (USPs)
+   -------------------------------------------------------------------------- */
+.usp-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.usp-card {
+  background: #ffffff;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 3px solid var(--ad-primary);
+}
+
+.usp-num {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ad-primary);
+}
+
+.usp-title {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.usp-desc {
+  font-size: 10px;
+  color: var(--text-body);
+  line-height: 1.4;
+}
+
+/* --------------------------------------------------------------------------
+   SECTION 8: FOOTER & INTERACTIVE QR CODE
+   -------------------------------------------------------------------------- */
+.footer-section {
+  display: grid;
+  grid-template-columns: 140px 1fr 160px;
+  align-items: center;
+  gap: 16px;
+  border-top: 2px solid var(--ad-primary);
+  padding-top: 12px;
+}
+
+.institution-logo-box {
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.phenikaa-logo {
+  max-width: 135px;
+  max-height: 85px;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.footer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10.5px;
+  color: var(--text-body);
+  line-height: 1.35;
+}
+
+.footer-info h4 {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.team-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-weight: 700;
+  color: var(--ad-primary);
+}
+
+.footer-advantech-tag {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 3px;
+}
+
+.partner-logo-text {
+  font-size: 16px;
+  font-weight: 900;
+  color: var(--ad-primary);
+  letter-spacing: 1px;
+}
+
+.partner-desc {
+  font-size: 9.5px;
+  color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   PRINT STYLING (FOR 80cm x 180cm BANNER OUTPUT)
+   -------------------------------------------------------------------------- */
+@media print {
+  @page {
+    size: 800mm 1800mm;
+    margin: 0;
+  }
+  
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #ffffff !important;
+    overflow: visible;
+  }
+
+  .standee-toolbar {
+    display: none !important;
+  }
+
+  .standee-viewport {
+    transform: none !important;
+    margin: 0 !important;
+  }
+
+  .standee-canvas {
+    width: 800mm !important;
+    min-height: 1800mm !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+}
