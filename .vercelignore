@@ -1,0 +1,22 @@
+# Python environment and cache
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Raw training datasets & binary models (Kept on Edge Pi 3)
+data/
+backend/model_*.pkl
+backend/__pycache__/
+tests/
+serial_pipeline/
+
+# IDE and git files
+.git/
+.gitignore
+.gemini/
+scratch/
+docs/ResearchPaper.pdf
+*.bak
+*.tmp

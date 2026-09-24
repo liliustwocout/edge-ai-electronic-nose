@@ -329,10 +329,30 @@ journalctl -u aiot-gateway.service -f        # Xem log thời gian thực
 ```
 
 Mở trình duyệt truy cập trực tiếp từ bất kỳ máy nào trong mạng Tailscale:
+- **Cổng Portal Trung Tâm:** [http://100.72.0.24:8001/index.html](http://100.72.0.24:8001/index.html)
 - **Dashboard Vận Hành:** [http://100.72.0.24:8001/dashboard/index.html](http://100.72.0.24:8001/dashboard/index.html)
 - **Thực Nghiệm Phần Cứng:** [http://100.72.0.24:8001/dashboard/experiment.html](http://100.72.0.24:8001/dashboard/experiment.html)
 - **Standee Triển Lãm (80x180cm):** [http://100.72.0.24:8001/standee/index.html](http://100.72.0.24:8001/standee/index.html)
 - **Kiểm Tra Trạng Thái API:** [http://100.72.0.24:8001/health](http://100.72.0.24:8001/health)
+
+### 3. Triển Khai Frontend Lên Vercel (Public Web Toàn Cầu)
+
+Hệ thống hỗ trợ kiến trúc phân tán Hybrid Edge-Cloud:
+- **Raspberry Pi 3 (Biên):** Đọc cảm biến RS-485, chạy AI suy luận tại chỗ (3.8ms) và tự động đồng bộ kết quả lên Firebase Realtime Database (`/edge_ai`).
+- **Vercel (Đám mây):** Phân phối giao diện Dashboard tĩnh qua CDN toàn cầu, tự động lắng nghe luồng dữ liệu thời gian thực từ Firebase qua Server-Sent Events (SSE).
+
+**Các bước triển khai lên Vercel:**
+1. Cài đặt Vercel CLI (nếu chưa có): `npm install -g vercel`
+2. Đăng nhập và deploy ngay từ thư mục gốc dự án:
+   ```bash
+   vercel --prod
+   ```
+   *(Hoặc liên kết trực tiếp repository GitHub với tài khoản Vercel để kích hoạt chế độ Auto-deploy mỗi khi git push).*
+3. Truy cập vào domain Vercel được cấp (ví dụ: `https://ten-du-an.vercel.app/`):
+   - `/`: Cổng Portal Tổng Quan & Tình Trạng Cloud
+   - `/dashboard`: Trung Tâm Giám Sát Điều Hành WISE-IoT
+   - `/experiment`: Dao Động Ký & Phân Tích Sóng Xung Real-time
+   - `/standee`: Màn Hình Khổ Đứng Triển Lãm 80x180cm
 
 *(Xem hướng dẫn đầy đủ tại [docs/DEPLOYMENT_PI3.md](file:///g:/Project/AIoT/docs/DEPLOYMENT_PI3.md) và [docs/OPERATING_SCENARIOS.md](file:///g:/Project/AIoT/docs/OPERATING_SCENARIOS.md))*
 

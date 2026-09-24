@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="vi" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edge AI Electronic Nose | Industrial Safety Gateway</title>
+  <meta name="description" content="Edge AI-Based Electronic Nose for Hydrogen Sulfide Leak Detection & Industrial Gas Monitoring. Powered by Advantech AIoT & Raspberry Pi 3.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              400: '#38bdf8',
+              500: '#0284c7',
+              600: '#0369a1',
+              900: '#0c4a6e',
+              950: '#082f49',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: radial-gradient(circle at 50% 0%, #0f172a 0%, #020617 100%);
+      min-height: 100vh;
+      color: #f8fafc;
+    }
+    .glass-card {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(56, 189, 248, 0.3);
+      box-shadow: 0 20px 40px -15px rgba(2, 132, 199, 0.25);
+    }
+    .glow-cyan {
+      box-shadow: 0 0 50px -10px rgba(56, 189, 248, 0.15);
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen selection:bg-sky-500 selection:text-white">
+
+  <!-- TOP HEADER -->
+  <header class="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-cyan-400 p-[1px] flex items-center justify-center shadow-lg shadow-sky-500/20">
+          <div class="w-full h-full bg-slate-950 rounded-[11px] flex items-center justify-center">
+            <i data-lucide="activity" class="w-5 h-5 text-sky-400"></i>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-bold text-base tracking-wide text-white">E-NOSE EDGE AI</span>
+            <span class="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-sky-950/80 text-sky-400 border border-sky-500/30">Advantech InnoWorks</span>
+          </div>
+          <p class="text-xs text-slate-400 font-mono">Phenikaa University × TaskForce141</p>
+        </div>
+      </div>
+
+      <!-- EDGE GATEWAY LIVE BADGE -->
+      <div class="flex items-center gap-3">
+        <div id="cloudStatusBadge" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700/60 text-xs">
+          <span class="relative flex h-2 w-2">
+            <span id="pingDot" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span id="statusDot" class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </span>
+          <span class="text-slate-300 font-mono text-[11px]" id="statusText">Kết nối Cloud: Đang nạp...</span>
+        </div>
+        <a href="https://github.com/liliustwocout/edge-ai-electronic-nose" target="_blank" class="p-2 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-colors">
+          <i data-lucide="github" class="w-4 h-4"></i>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO SECTION -->
+  <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16 flex flex-col justify-center">
+    
+    <div class="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs font-medium mb-4">
+        <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i>
+        Hệ Thống An Toàn Khí Độc Công Nghiệp Thông Minh
+      </div>
+      <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mb-4 leading-tight">
+        Hệ Thống Mũi Điện Tử <span class="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-cyan-300 to-emerald-400">Edge AI</span>
+      </h1>
+      <p class="text-base sm:text-lg text-slate-300 leading-relaxed font-light">
+        Nhận diện rò rỉ khí Hydrogen Sulfide (<span class="font-mono text-amber-300 font-normal">H₂S</span>) & Ammonia (<span class="font-mono text-cyan-300 font-normal">NH₃</span>) siêu sớm tại biên với độ trễ <strong>3.8 ms</strong>, thuật toán <strong>RandomForest Dual-Mode</strong> đạt độ chính xác <strong>95.21%</strong>.
+      </p>
+
+      <!-- LIVE TELEMETRY TICKER -->
+      <div class="mt-8 inline-flex flex-wrap items-center justify-center gap-3 px-4 py-2.5 rounded-2xl bg-slate-900/80 border border-slate-800 text-xs font-mono shadow-inner">
+        <div class="flex items-center gap-1.5 text-slate-400">
+          <i data-lucide="cpu" class="w-3.5 h-3.5 text-sky-400"></i>
+          <span>Gateway:</span>
+          <span class="text-slate-200" id="liveDevice">Raspberry Pi 3 (ARM64)</span>
+        </div>
+        <span class="text-slate-700 hidden sm:inline">•</span>
+        <div class="flex items-center gap-1.5 text-slate-400">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Khí Hiện Tại:</span>
+          <span class="text-emerald-400 font-semibold" id="liveGas">Clean Air</span>
+        </div>
+        <span class="text-slate-700 hidden sm:inline">•</span>
+        <div class="flex items-center gap-1.5 text-slate-400">
+          <i data-lucide="target" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Độ Tin Cậy:</span>
+          <span class="text-cyan-300 font-semibold" id="liveConfidence">91%</span>
+        </div>
+        <span class="text-slate-700 hidden sm:inline">•</span>
+        <div class="flex items-center gap-1.5 text-slate-400">
+          <i data-lucide="clock" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span>Cập nhật:</span>
+          <span class="text-slate-300" id="liveTime">Vừa xong</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 MAIN ENTRY CARDS -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 mb-16">
+      
+      <!-- CARD 1: DASHBOARD -->
+      <a href="/dashboard/index.html" class="glass-card rounded-2xl p-6 sm:p-7 flex flex-col group text-left relative overflow-hidden">
+        <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-sky-500/10 rounded-full blur-2xl group-hover:bg-sky-500/20 transition-all"></div>
+        <div class="w-12 h-12 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 mb-5 group-hover:scale-110 transition-transform">
+          <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+        </div>
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xl font-bold text-white group-hover:text-sky-400 transition-colors">Trung Tâm Điều Hành</h2>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-800">PORTAL</span>
+        </div>
+        <p class="text-sm text-slate-400 leading-relaxed mb-6 flex-1">
+          Giám sát an toàn toàn diện: Bản đồ nhà máy 2D, đồng hồ đo nồng độ ppm, phân cấp 4 mức cảnh báo OSHA, bộ lọc EMA và lịch sử sự cố rò rỉ.
+        </p>
+        <div class="flex items-center text-xs font-semibold text-sky-400 group-hover:translate-x-1 transition-transform">
+          <span>Mở Dashboard Vận Hành</span>
+          <i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
+        </div>
+      </a>
+
+      <!-- CARD 2: EXPERIMENT & WAVECYCLE -->
+      <a href="/dashboard/experiment.html" class="glass-card rounded-2xl p-6 sm:p-7 flex flex-col group text-left relative overflow-hidden border-sky-500/30">
+        <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition-all"></div>
+        <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 mb-5 group-hover:scale-110 transition-transform">
+          <i data-lucide="line-chart" class="w-6 h-6"></i>
+        </div>
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xl font-bold text-white group-hover:text-cyan-400 transition-colors">Thực Nghiệm & Sóng Xung</h2>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">REALTIME</span>
+        </div>
+        <p class="text-sm text-slate-400 leading-relaxed mb-6 flex-1">
+          Dao động ký sóng nhiệt 250 điểm/chu kỳ từ cổng USB-RS485. Phân tích đặc trưng xung, trôi baseline nhiệt ẩm và xuất báo cáo CSV thực nghiệm.
+        </p>
+        <div class="flex items-center text-xs font-semibold text-cyan-400 group-hover:translate-x-1 transition-transform">
+          <span>Xem Dao Động Ký & AI Live</span>
+          <i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
+        </div>
+      </a>
+
+      <!-- CARD 3: STANDEE -->
+      <a href="/standee/index.html" class="glass-card rounded-2xl p-6 sm:p-7 flex flex-col group text-left relative overflow-hidden">
+        <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all"></div>
+        <div class="w-12 h-12 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 mb-5 group-hover:scale-110 transition-transform">
+          <i data-lucide="presentation" class="w-6 h-6"></i>
+        </div>
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xl font-bold text-white group-hover:text-purple-400 transition-colors">Standee Triển Lãm</h2>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800">80x180 CM</span>
+        </div>
+        <p class="text-sm text-slate-400 leading-relaxed mb-6 flex-1">
+          Poster khổ đứng tiêu chuẩn triển lãm cuộc thi Advantech InnoWorks. Trực quan hóa kiến trúc 5 tầng AIoT, thông số kỹ thuật và biểu đồ nhận diện khí.
+        </p>
+        <div class="flex items-center text-xs font-semibold text-purple-400 group-hover:translate-x-1 transition-transform">
+          <span>Mở Màn Hình Khổ Đứng</span>
+          <i data-lucide="arrow-right" class="w-4 h-4 ml-1"></i>
+        </div>
+      </a>
+
+    </div>
+
+    <!-- SPECS MATRIX -->
+    <div class="glass-card rounded-2xl p-6 sm:p-8">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-slate-800 pb-5">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="layers" class="w-4 h-4 text-sky-400"></i>
+            Thông Số Kỹ Thuật Hệ Thống Edge AI
+          </h3>
+          <p class="text-xs text-slate-400 mt-0.5">Kiến trúc nhúng biên kết hợp đồng bộ hóa đám mây</p>
+        </div>
+        <div class="flex items-center gap-2 text-xs font-mono text-slate-400">
+          <span class="px-2.5 py-1 rounded bg-slate-900 border border-slate-800">Baud: 115200</span>
+          <span class="px-2.5 py-1 rounded bg-slate-900 border border-slate-800">Bus: RS-485</span>
+          <span class="px-2.5 py-1 rounded bg-slate-900 border border-slate-800">RAM: ~80MB</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
+          <div class="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono">95.21%</div>
+          <div class="text-[11px] text-slate-400 mt-1 uppercase tracking-wider">Độ Chính Xác Phân Loại</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
+          <div class="text-2xl sm:text-3xl font-extrabold text-sky-400 font-mono">3.8 ms</div>
+          <div class="text-[11px] text-slate-400 mt-1 uppercase tracking-wider">Độ Trễ Suy Luận Biên</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
+          <div class="text-2xl sm:text-3xl font-extrabold text-amber-400 font-mono">3.79 ppm</div>
+          <div class="text-[11px] text-slate-400 mt-1 uppercase tracking-wider">Sai Số Nồng Độ (MAE)</div>
+        </div>
+        <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
+          <div class="text-2xl sm:text-3xl font-extrabold text-purple-400 font-mono">250 pts</div>
+          <div class="text-[11px] text-slate-400 mt-1 uppercase tracking-wider">Độ Phân Giải Chu Kỳ Xung</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-slate-800/80 bg-slate-950/80 py-6 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+      <p>© 2026 TaskForce141 - Advantech AIoT InnoWorks. All rights reserved.</p>
+      <div class="flex items-center gap-4">
+        <a href="/dashboard/index.html" class="hover:text-slate-300 transition-colors">Dashboard</a>
+        <span>•</span>
+        <a href="/dashboard/experiment.html" class="hover:text-slate-300 transition-colors">Thực Nghiệm</a>
+        <span>•</span>
+        <a href="/standee/index.html" class="hover:text-slate-300 transition-colors">Standee</a>
+        <span>•</span>
+        <a href="https://github.com/liliustwocout/edge-ai-electronic-nose" target="_blank" class="hover:text-slate-300 transition-colors">GitHub</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    lucide.createIcons();
+
+    // Connect to Firebase Realtime Stream to show live status on root portal
+    const FIREBASE_URL = 'https://enose-1aeb7-default-rtdb.asia-southeast1.firebasedatabase.app/edge_ai/latest.json?auth=qbtMtFdVKPlt5kBvQoD7ELUITrqs1qoPPuNmgQ0y';
+
+    function initCloudStatus() {
+      const statusText = document.getElementById('statusText');
+      const liveGas = document.getElementById('liveGas');
+      const liveConfidence = document.getElementById('liveConfidence');
+      const liveTime = document.getElementById('liveTime');
+      const liveDevice = document.getElementById('liveDevice');
+      const pingDot = document.getElementById('pingDot');
+      const statusDot = document.getElementById('statusDot');
+
+      try {
+        const sse = new EventSource(FIREBASE_URL);
+
+        sse.onmessage = (event) => {
+          try {
+            const res = JSON.parse(event.data);
+            const data = res.data || res;
+            if (data && data.inference) {
+              if (statusText) statusText.innerText = `Firebase Cloud: Trực Tiếp (${data.source || 'RS-485'})`;
+              if (liveGas) {
+                liveGas.innerText = data.inference.gas || 'Clean Air';
+                if (data.inference.gas === 'H2S') liveGas.className = 'text-red-400 font-semibold';
+                else if (data.inference.gas === 'NH3') liveGas.className = 'text-orange-400 font-semibold';
+                else liveGas.className = 'text-emerald-400 font-semibold';
+              }
+              if (liveConfidence) liveConfidence.innerText = `${Math.round(data.inference.confidence || 90)}%`;
+              if (liveTime && data.timestamp) liveTime.innerText = data.timestamp.split(' ')[1] || 'Vừa xong';
+              if (liveDevice && data.device) liveDevice.innerText = data.device.replace(' (Edge Gateway)', '');
+              if (statusDot) statusDot.className = 'relative inline-flex rounded-full h-2 w-2 bg-emerald-500';
+              if (pingDot) pingDot.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
+            }
+          } catch (err) {}
+        };
+
+        sse.onerror = () => {
+          if (statusText) statusText.innerText = 'Firebase Cloud: Đang kết nối lại...';
+          if (statusDot) statusDot.className = 'relative inline-flex rounded-full h-2 w-2 bg-amber-500';
+          if (pingDot) pingDot.className = 'hidden';
+        };
+      } catch (e) {
+        if (statusText) statusText.innerText = 'Cloud: Ngoại tuyến';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', initCloudStatus);
+  </script>
+</body>
+</html>

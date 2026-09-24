@@ -1194,14 +1194,26 @@
       }
 
       connectBackendWs() {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/live_experiment`;
+        const urlParams = new URLSearchParams(window.location.search);
+        const customGateway = urlParams.get('gateway') || localStorage.getItem('enose_custom_gateway');
+        const isVercel = window.location.hostname.includes('vercel.app') || (window.location.protocol === 'https:' && !['localhost', '127.0.0.1'].includes(window.location.hostname) && !window.location.port);
+
+        // If on Vercel and no explicit custom gateway is provided, connect to Firebase Cloud SSE directly
+        if (isVercel && !customGateway) {
+          this.connectFirebaseSse();
+          return;
+        }
+
+        const protocol = (customGateway && customGateway.startsWith('https')) ? 'wss:' : (window.location.protocol === 'https:' ? 'wss:' : 'ws:');
+        const host = customGateway ? customGateway.replace(/^https?:\/\//, '') : window.location.host;
+        const wsUrl = `${protocol}//${host}/ws/live_experiment`;
 
         try {
           this.ws = new WebSocket(wsUrl);
 
           this.ws.onopen = () => {
             this.stopFallbackPolling();
+            if (this.firebaseSse) { this.firebaseSse.close(); this.firebaseSse = null; }
             this.updateConnectionStatus(true, 'RS-485 /dev/ttyUSB0 (Live)');
             this.fetchEdgeFirebaseStatus();
           };
@@ -1222,16 +1234,60 @@
           };
 
           this.ws.onclose = () => {
-            this.updateConnectionStatus(false, 'Mất Kết Nối Gateway (Thử lại sau 2s...)');
+            this.updateConnectionStatus(false, 'Mất Kết Nối Gateway (Chuyển sang Cloud Sync)');
+            this.connectFirebaseSse();
             this.retryConnect();
           };
 
           this.ws.onerror = () => {
-            this.updateConnectionStatus(false, 'Ngoại Tuyến - Chuyển sang REST RS-485');
+            this.updateConnectionStatus(false, 'Ngoại Tuyến - Chuyển sang Firebase Cloud');
+            this.connectFirebaseSse();
             this.startFallbackPolling();
           };
         } catch (err) {
+          this.connectFirebaseSse();
           this.startFallbackPolling();
+        }
+      }
+
+      connectFirebaseSse() {
+        if (this.firebaseSse) return;
+        const sseUrl = 'https://enose-1aeb7-default-rtdb.asia-southeast1.firebasedatabase.app/edge_ai/latest.json?auth=qbtMtFdVKPlt5kBvQoD7ELUITrqs1qoPPuNmgQ0y';
+        try {
+          this.firebaseSse = new EventSource(sseUrl);
+          this.updateConnectionStatus(true, 'Cloud Sync: Firebase /edge_ai (Live)');
+          const brEl = document.getElementById('firebaseBranchText');
+          if (brEl) brEl.innerHTML = `/edge_ai (Live Stream) <span class="text-emerald-400 font-bold ml-1 animate-pulse">● Active</span>`;
+
+          this.firebaseSse.onmessage = (event) => {
+            if (this.isPaused) return;
+            try {
+              const res = JSON.parse(event.data);
+              const data = res.data || res;
+              if (data && data.point !== undefined) {
+                this.handleTelemetryPacket({
+                  type: 'telemetry',
+                  point: data.point,
+                  voltage1: data.voltage1,
+                  voltage2: data.voltage2 || 0.0,
+                  sensor1: data.sensor1,
+                  rawSensor1: data.rawSensor1,
+                  cycle: data.cycle || 1,
+                  source: data.source || 'RS485_FT232',
+                  timestamp: data.timestamp,
+                  inference: data.inference
+                });
+              }
+            } catch (e) {
+              console.warn('Firebase SSE parse error', e);
+            }
+          };
+
+          this.firebaseSse.onerror = () => {
+            this.updateConnectionStatus(false, 'Cloud Sync: Đang kết nối lại...');
+          };
+        } catch (e) {
+          console.error('Failed to open Firebase SSE', e);
         }
       }
 
@@ -1350,13 +1406,24 @@
         const telemetry = packet.telemetry || packet;
         const inference = packet.inference || {};
 
-        this.updateConnectionStatus(true, `RS-485 /dev/ttyUSB0 (Live)`);
-        const subEl = document.getElementById('labSubtitle');
-        if (subEl) subEl.innerText = 'RS-485 Hardware (FT232)';
-        const chEl = document.getElementById('channelName');
-        if (chEl) chEl.innerText = 'RS-485 (/dev/ttyUSB0)';
-        const brEl = document.getElementById('firebaseBranchText');
-        if (brEl) brEl.innerHTML = `/edge_ai (Push Only) <span class="text-emerald-400 font-bold ml-1 animate-pulse">● Pushing</span>`;
+        const isFromCloud = Boolean(this.firebaseSse && (!this.ws || this.ws.readyState !== WebSocket.OPEN));
+        if (isFromCloud) {
+          this.updateConnectionStatus(true, 'Cloud Sync: Firebase /edge_ai (Live)');
+          const subEl = document.getElementById('labSubtitle');
+          if (subEl) subEl.innerText = 'Cloud Stream (Raspberry Pi 3 Edge Gateway)';
+          const chEl = document.getElementById('channelName');
+          if (chEl) chEl.innerText = 'RS-485 via Firebase (/edge_ai)';
+          const brEl = document.getElementById('firebaseBranchText');
+          if (brEl) brEl.innerHTML = `/edge_ai (Live Stream) <span class="text-emerald-400 font-bold ml-1 animate-pulse">● Active</span>`;
+        } else {
+          this.updateConnectionStatus(true, `RS-485 /dev/ttyUSB0 (Live)`);
+          const subEl = document.getElementById('labSubtitle');
+          if (subEl) subEl.innerText = 'RS-485 Hardware (FT232)';
+          const chEl = document.getElementById('channelName');
+          if (chEl) chEl.innerText = 'RS-485 (/dev/ttyUSB0)';
+          const brEl = document.getElementById('firebaseBranchText');
+          if (brEl) brEl.innerHTML = `/edge_ai (Push Only) <span class="text-emerald-400 font-bold ml-1 animate-pulse">● Pushing</span>`;
+        }
 
         // 1. Apply hardware despike if enabled
         if (this.despikeEnabled) {

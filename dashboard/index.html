@@ -119,6 +119,15 @@
         <i data-lucide="activity" class="w-3.5 h-3.5"></i>
         <span data-i18n="prognosticsSafe">AI Prognostics: Safe Baseline</span>
       </div>
+      <div id="dataSourceBadge"
+        class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded border border-sky-500/30 bg-sky-500/10 text-sky-300 text-[11px] font-mono"
+        title="Nguồn dữ liệu (Local WebSocket hoặc Firebase Cloud Sync)">
+        <span class="relative flex h-2 w-2">
+          <span id="dsPingDot" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+          <span id="dsStatusDot" class="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+        </span>
+        <span id="dataSourceText">Đang Kết Nối...</span>
+      </div>
       <div id="baselineBadgeIndex"
         class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded border border-amber-500/30 bg-amber-500/10 text-amber-300 text-[11px] font-mono"
         title="Đường nền tham chiếu V0 & Độ lệch vi sai ΔV (Outdoor Drift Compensation)">
@@ -455,13 +464,23 @@
       constructor(onDataCallback) {
         this.onDataCallback = onDataCallback;
         this.ws = null;
+        this.sse = null;
         this.activeMode = 'fieldScenario';
         this.isPlaying = true;
         this.speedMultiplier = 1;
+        this.firebaseUrl = 'https://enose-1aeb7-default-rtdb.asia-southeast1.firebasedatabase.app/edge_ai/latest.json?auth=qbtMtFdVKPlt5kBvQoD7ELUITrqs1qoPPuNmgQ0y';
       }
       async init() {
-        this.connectWs();
+        this.connect();
         return true;
+      }
+      connect() {
+        const isVercel = window.location.hostname.includes('vercel.app') || (window.location.protocol === 'https:' && !['localhost', '127.0.0.1'].includes(window.location.hostname) && !window.location.port);
+        if (isVercel) {
+          this.connectFirebaseSse();
+          return;
+        }
+        this.connectWs();
       }
       connectWs() {
         try {
@@ -469,6 +488,8 @@
           const host = window.location.host || '127.0.0.1:8001';
           this.ws = new WebSocket(`${protocol}//${host}/stream`);
           this.ws.onopen = () => {
+            this.updateBadge('RS-485 Edge (Local WS)', true);
+            if (this.sse) { this.sse.close(); this.sse = null; }
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
               this.ws.send(JSON.stringify({ action: 'setMode', mode: this.activeMode }));
               this.ws.send(JSON.stringify({ action: 'setSpeed', multiplier: this.speedMultiplier }));
@@ -484,9 +505,77 @@
             } catch (err) { }
           };
           this.ws.onclose = () => {
-            setTimeout(() => this.connectWs(), 2000);
+            this.connectFirebaseSse();
+            setTimeout(() => this.connectWs(), 5000);
           };
-        } catch (err) { }
+          this.ws.onerror = () => {
+            this.connectFirebaseSse();
+          };
+        } catch (err) {
+          this.connectFirebaseSse();
+        }
+      }
+      connectFirebaseSse() {
+        if (this.sse) return;
+        try {
+          this.sse = new EventSource(this.firebaseUrl);
+          this.updateBadge('Cloud: Firebase /edge_ai', true);
+          this.sse.onmessage = (event) => {
+            try {
+              const res = JSON.parse(event.data);
+              const data = res.data || res;
+              if (data && data.inference && this.onDataCallback) {
+                const inf = data.inference;
+                const packet = {
+                  gas: inf.gas || 'Clean Air',
+                  ppm: inf.estimatedppm !== undefined ? inf.estimatedppm : (inf.ppm || 0),
+                  estimatedppm: inf.estimatedppm !== undefined ? inf.estimatedppm : (inf.ppm || 0),
+                  confidence: inf.confidence || 90,
+                  riskLevel: inf.riskLevel || 'Normal',
+                  probabilities: inf.probabilities || { 'Clean Air': 1.0, 'H2S': 0.0, 'NH3': 0.0 },
+                  s3: data.voltage1 || 0.0,
+                  s3Raw: data.voltage1 || 0.0,
+                  frameIndex: data.point !== undefined ? data.point : 0,
+                  point: data.point !== undefined ? data.point : 0,
+                  voltage1: data.voltage1 || 0,
+                  cycle: data.cycle || 1,
+                  latencyMs: inf.latencyMs || 3.8,
+                  s3Baseline: inf.baseline || 0.0,
+                  s3Delta: inf.delta || 0.0,
+                  calibrationState: inf.calibrationState,
+                  timestamp: data.timestamp,
+                  device: data.device || 'Raspberry Pi 3',
+                  source: 'Firebase /edge_ai'
+                };
+                this.onDataCallback(packet);
+              }
+            } catch (e) {}
+          };
+          this.sse.onerror = () => {
+            this.updateBadge('Cloud: Đang kết nối lại...', false);
+          };
+        } catch (e) {
+          this.updateBadge('Cloud: Ngoại tuyến', false);
+        }
+      }
+      updateBadge(text, isOnline) {
+        const textEl = document.getElementById('dataSourceText');
+        const badge = document.getElementById('dataSourceBadge');
+        const pingDot = document.getElementById('dsPingDot');
+        const statusDot = document.getElementById('dsStatusDot');
+        if (textEl) textEl.innerText = text;
+        if (badge) {
+          badge.classList.remove('border-emerald-500/30', 'bg-emerald-500/10', 'text-emerald-300', 'border-amber-500/30', 'bg-amber-500/10', 'text-amber-300');
+          if (isOnline) {
+            badge.classList.add('border-emerald-500/30', 'bg-emerald-500/10', 'text-emerald-300');
+            if (statusDot) statusDot.className = 'relative inline-flex rounded-full h-2 w-2 bg-emerald-500';
+            if (pingDot) pingDot.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
+          } else {
+            badge.classList.add('border-amber-500/30', 'bg-amber-500/10', 'text-amber-300');
+            if (statusDot) statusDot.className = 'relative inline-flex rounded-full h-2 w-2 bg-amber-500';
+            if (pingDot) pingDot.className = 'hidden';
+          }
+        }
       }
       setMode(modeName) {
         this.activeMode = modeName;
@@ -1210,10 +1299,20 @@
       }
       onTelemetryReceived(packet) {
         this.frameCount++;
+        if (packet.s3 === undefined && packet.voltage1 !== undefined) {
+          packet.s3 = packet.voltage1;
+          packet.s3Raw = packet.voltage1;
+        }
+        if (packet.frameIndex === undefined && packet.point !== undefined) {
+          packet.frameIndex = packet.point;
+        }
+        if (packet.estimatedppm === undefined && packet.ppm !== undefined) {
+          packet.estimatedppm = packet.ppm;
+        }
         const baseEl = document.getElementById('idxBaselineVal');
         const deltaEl = document.getElementById('idxDeltaVal');
         const baseVal = packet.s3Baseline !== undefined ? packet.s3Baseline : (packet.inference && packet.inference.baseline !== undefined ? packet.inference.baseline : 0.0);
-        const deltaVal = packet.s3Delta !== undefined ? packet.s3Delta : (packet.s3 - baseVal);
+        const deltaVal = packet.s3Delta !== undefined ? packet.s3Delta : ((packet.s3 !== undefined && baseVal !== undefined) ? (packet.s3 - baseVal) : 0.0);
         if (baseEl && baseVal !== undefined) baseEl.innerText = `${parseFloat(baseVal).toFixed(3)}V`;
         if (deltaEl && deltaVal !== undefined) {
           deltaEl.innerText = `${deltaVal >= 0 ? '+' : ''}${parseFloat(deltaVal).toFixed(3)}V`;
