@@ -1,4 +1,8 @@
 import os
+import sys
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 import json
 import time
 import pickle
@@ -63,10 +67,10 @@ def buildScenarios():
     point_cols = [c for c in airDf.columns if c.startswith('Point_')]
 
     # Pick representative pulses
-    # H2S: 10ppm pulse (Pulse 35)
-    h2s_pulse = h2sDf[h2sDf['Pulse_Index'] == 'Pulse_35'][point_cols].values[0].tolist() if 'Pulse_35' in h2sDf['Pulse_Index'].values else h2sDf[point_cols].iloc[-1].values.tolist()
-    # NH3: 50ppm pulse (Pulse 20)
-    nh3_pulse = nh3Df[nh3Df['Pulse_Index'] == 'Pulse_20'][point_cols].values[0].tolist() if 'Pulse_20' in nh3Df['Pulse_Index'].values else nh3Df[point_cols].iloc[20].values.tolist()
+    # H2S: 10ppm pulse (Pulse 95)
+    h2s_pulse = h2sDf[h2sDf['Pulse_Index'] == 'Pulse_95'][point_cols].values[0].tolist() if 'Pulse_95' in h2sDf['Pulse_Index'].values else h2sDf[point_cols].iloc[-1].values.tolist()
+    # NH3: 50ppm pulse (Pulse 60)
+    nh3_pulse = nh3Df[nh3Df['Pulse_Index'] == 'Pulse_60'][point_cols].values[0].tolist() if 'Pulse_60' in nh3Df['Pulse_Index'].values else nh3Df[point_cols].iloc[20].values.tolist()
     # Air Clean: Pulse 5
     air_pulse = airDf[point_cols].iloc[5].values.tolist()
 
@@ -182,7 +186,7 @@ def runInference(windowValues, compS3):
     estimatedppm = round(float(max(0.0, reg_win.predict(featArr)[0])), 2)
 
     # Baseline threshold guard
-    if float(compS3) <= 0.65 and predGas != 'Clean Air':
+    if float(compS3) <= 0.32 and predGas != 'Clean Air':
         predGas = 'Clean Air'
         estimatedppm = 0.0
         conf = max(conf, 96)
@@ -200,18 +204,18 @@ def runInference(windowValues, compS3):
 def computeRiskLevel(gas, ppmVal, compVal):
     risk = 'Normal'
     if gas == 'H2S':
-        if ppmVal >= 50.0 or compVal >= 2.45:
+        if ppmVal >= 10.0 or compVal >= 0.85:
             risk = 'Emergency'
-        elif ppmVal >= 10.0 or compVal >= 2.30:
+        elif ppmVal >= 5.0 or compVal >= 0.60:
             risk = 'Hazardous'
-        elif ppmVal >= 1.0 or compVal >= 1.05:
+        elif ppmVal >= 1.0 or compVal >= 0.40:
             risk = 'Warning'
     elif gas == 'NH3':
-        if ppmVal >= 100.0 or compVal >= 2.30:
+        if ppmVal >= 100.0 or compVal >= 0.95:
             risk = 'Emergency'
-        elif ppmVal >= 50.0 or compVal >= 2.26:
+        elif ppmVal >= 50.0 or compVal >= 0.85:
             risk = 'Hazardous'
-        elif ppmVal >= 25.0 or compVal >= 1.10:
+        elif ppmVal >= 25.0 or compVal >= 0.65:
             risk = 'Warning'
     return risk
 
@@ -551,4 +555,7 @@ async def streamWs(ws: WebSocket):
 
 
 if __name__ == '__main__':
-    uvicorn.run(app, host='127.0.0.1', port=8001)
+    host = os.getenv('HOST', '0.0.0.0')
+    port = int(os.getenv('PORT', 8001))
+    print(f"Starting Electronic Nose Edge AI Gateway on http://{host}:{port}")
+    uvicorn.run(app, host=host, port=port)

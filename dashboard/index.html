@@ -85,7 +85,8 @@
       <div class="hidden md:flex items-center gap-1.5 text-xs text-slate-500">
         <span>&#9638; Dashboard</span>
         <span>&rsaquo;</span>
-        <span class="text-slate-400" data-i18n="navBreadcrumb">Single-Sensor - MQ136 True Edge AI Gateway &bull; TaskForce141</span>
+        <span class="text-slate-400" data-i18n="navBreadcrumb">Single-Sensor - MQ136 True Edge AI Gateway &bull;
+          TaskForce141</span>
       </div>
     </div>
     <div class="flex items-center gap-2 md:gap-2.5">
@@ -157,12 +158,15 @@
       </div>
       <div class="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
         <button id="btnToggleEma"
-          class="px-3 py-1.5 rounded bg-sky-500/10 border border-sky-500/50 text-sky-400 text-xs whitespace-nowrap" data-i18n="emaFilterOn">Bộ Lọc EMA: Bật - α=0.2</button>
+          class="px-3 py-1.5 rounded bg-sky-500/10 border border-sky-500/50 text-sky-400 text-xs whitespace-nowrap"
+          data-i18n="emaFilterOn">Bộ Lọc EMA: Bật - α=0.2</button>
         <button id="btnToggleDrift"
-          class="px-3 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 text-xs whitespace-nowrap" data-i18n="driftCompOn">Bù Trôi (Drift): Bật</button>
+          class="px-3 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 text-xs whitespace-nowrap"
+          data-i18n="driftCompOn">Bù Trôi (Drift): Bật</button>
         <button id="btnPlayPause"
           class="px-3 py-1.5 rounded bg-slate-800 border border-slate-700 text-slate-300 hover:bg-slate-700 text-xs whitespace-nowrap flex items-center gap-1"><i
-            data-lucide="pause" class="w-3.5 h-3.5"></i> <span id="playPauseText" data-i18n="btnPause">Tạm Dừng</span></button>
+            data-lucide="pause" class="w-3.5 h-3.5"></i> <span id="playPauseText" data-i18n="btnPause">Tạm
+            Dừng</span></button>
         <button id="speed1x"
           class="speedBtn active px-2.5 py-1.5 rounded bg-sky-500/10 border border-sky-500/50 text-sky-400 text-xs ">1x</button>
         <button id="speed2x"
@@ -173,19 +177,23 @@
       <div
         class="flex flex-col justify-between p-3.5 min-h-[86px] rounded border border-emerald-500/40 bg-emerald-950/20 shadow-[0_0_15px_rgba(16,185,129,0.05)]">
         <div class="text-[10px] text-emerald-400/80  tracking-wider flex items-center gap-1.5">
-          <i data-lucide="cloud-fog" class="w-3.5 h-3.5"></i> <span data-i18n="kpiEstConcentration">Nồng Độ Ước Tính</span>
+          <i data-lucide="cloud-fog" class="w-3.5 h-3.5"></i> <span data-i18n="kpiEstConcentration">Nồng Độ Ước
+            Tính</span>
         </div>
         <div class="text-[22px] text-emerald-300 tracking-tight mt-1" id="kpippmVal">0.0 ppm</div>
-        <div class="text-[10px] text-emerald-500/70 mt-1 truncate"><span data-i18n="kpiActiveScenario">Kịch bản:</span> <span id="currentGasTitle">Field Scenario -
+        <div class="text-[10px] text-emerald-500/70 mt-1 truncate"><span data-i18n="kpiActiveScenario">Kịch bản:</span>
+          <span id="currentGasTitle">Field Scenario -
             Auto</span></div>
       </div>
       <div
         class="flex flex-col justify-between p-3.5 min-h-[86px] rounded border border-amber-500/40 bg-amber-950/20 shadow-[0_0_15px_rgba(245,158,11,0.05)]">
         <div class="text-[10px] text-amber-400/80  tracking-wider flex items-center gap-1.5">
-          <i data-lucide="zap" class="w-3.5 h-3.5"></i> <span data-i18n="kpiSensorDvDt">Cảm Biến MQ136 &amp; dV/dt</span>
+          <i data-lucide="zap" class="w-3.5 h-3.5"></i> <span data-i18n="kpiSensorDvDt">Cảm Biến MQ136 &amp;
+            dV/dt</span>
         </div>
         <div class="text-[22px] text-amber-300 tracking-tight mt-1" id="kpiPeakSensorVal">1.000 V - +0.0%/s</div>
-        <div class="text-[10px] text-amber-500/70 mt-1 truncate" id="tteSubDesc" data-i18n="kpiTteSafe">TTE: Trạng Thái Ổn Định An Toàn</div>
+        <div class="text-[10px] text-amber-500/70 mt-1 truncate" id="tteSubDesc" data-i18n="kpiTteSafe">TTE: Trạng Thái
+          Ổn Định An Toàn</div>
       </div>
       <div
         class="flex flex-col justify-between p-3.5 min-h-[86px] rounded border border-fuchsia-500/40 bg-fuchsia-950/20 shadow-[0_0_15px_rgba(192,38,211,0.05)]">
@@ -194,12 +202,14 @@
         </div>
         <div class="text-[22px] text-fuchsia-300 tracking-tight mt-1 truncate" id="kpiTotalSampleVal">Clean Air - Safe
         </div>
-        <div class="text-[10px] text-fuchsia-500/70 mt-1 truncate" data-i18n="kpiRfDualMode">RandomForest Song Song</div>
+        <div class="text-[10px] text-fuchsia-500/70 mt-1 truncate" data-i18n="kpiRfDualMode">RandomForest Song Song
+        </div>
       </div>
       <div
         class="flex flex-col justify-between p-3.5 min-h-[86px] rounded border border-sky-500/40 bg-sky-950/20 shadow-[0_0_15px_rgba(2,132,199,0.05)]">
         <div class="text-[10px] text-sky-400/80  tracking-wider flex items-center gap-1.5">
-          <i data-lucide="fast-forward" class="w-3.5 h-3.5"></i> <span data-i18n="kpiPredictedHorizon">Dự Đoán Tương Lai - +20s</span>
+          <i data-lucide="fast-forward" class="w-3.5 h-3.5"></i> <span data-i18n="kpiPredictedHorizon">Dự Đoán Tương Lai
+            - +20s</span>
         </div>
         <div class="text-[22px] text-sky-300 tracking-tight mt-1" id="kpiRangeVal">1.000 V</div>
         <div class="text-[10px] text-sky-500/70 mt-1 truncate" data-i18n="kpiExtrapolated">Quỹ Đạo Ngoại Suy</div>
@@ -207,18 +217,22 @@
       <div
         class="flex flex-col justify-between p-3.5 min-h-[86px] rounded border border-rose-500/40 bg-rose-950/20 shadow-[0_0_15px_rgba(225,29,72,0.05)]">
         <div class="text-[10px] text-rose-400/80  tracking-wider flex items-center gap-1.5">
-          <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> <span data-i18n="kpiSafetyStatus">Trạng Thái An Toàn</span>
+          <i data-lucide="shield-alert" class="w-3.5 h-3.5"></i> <span data-i18n="kpiSafetyStatus">Trạng Thái An
+            Toàn</span>
         </div>
         <div class="text-[22px] text-rose-300 tracking-tight mt-1" id="kpiRiskVal">Bình Thường</div>
-        <div class="text-[10px] text-rose-500/70 mt-1 truncate" data-i18n="kpiThresholdOsha">Kiểm Tra Ngưỡng OSHA PEL</div>
+        <div class="text-[10px] text-rose-500/70 mt-1 truncate" data-i18n="kpiThresholdOsha">Kiểm Tra Ngưỡng OSHA PEL
+        </div>
       </div>
       <div
         class="flex flex-col justify-between p-3.5 min-h-[86px] rounded border border-teal-500/40 bg-teal-950/20 shadow-[0_0_15px_rgba(13,148,136,0.05)]">
         <div class="text-[10px] text-teal-400/80  tracking-wider flex items-center gap-1.5">
-          <i data-lucide="target" class="w-3.5 h-3.5"></i> <span data-i18n="kpiModelAccuracy">Độ Chính Xác Mô Hình RF</span>
+          <i data-lucide="target" class="w-3.5 h-3.5"></i> <span data-i18n="kpiModelAccuracy">Độ Chính Xác Mô Hình
+            RF</span>
         </div>
         <div class="text-[22px] text-teal-300 tracking-tight mt-1" id="kpiMapeVal">95.8% Accuracy</div>
-        <div class="text-[10px] text-teal-500/70 mt-1 truncate" data-i18n="kpiRfEdgeAi">RandomForest &bull; Edge AI</div>
+        <div class="text-[10px] text-teal-500/70 mt-1 truncate" data-i18n="kpiRfEdgeAi">RandomForest &bull; Edge AI
+        </div>
       </div>
     </section>
     <section class="grid grid-cols-1 lg:grid-cols-12 gap-3">
@@ -239,21 +253,32 @@
         <div class="flex items-center justify-between px-3 py-2.5 border-b border-slate-800 bg-slate-900/80">
           <div class="flex items-center gap-2">
             <h3 class="text-xs text-slate-200 flex items-center gap-1.5"><i data-lucide="waves"
-                class="w-4 h-4 text-cyan-400"></i> <span data-i18n="chartWaveCycle">Dao Động Ký Chu Kỳ Sóng (250 Điểm / 60s)</span></h3>
-            <span id="waveCycleNumBadge" class="text-[10px] text-cyan-400 font-mono tracking-wider bg-cyan-400/10 px-2 py-0.5 rounded border border-cyan-500/20">Cycle #1</span>
+                class="w-4 h-4 text-cyan-400"></i> <span data-i18n="chartWaveCycle">Dao Động Ký Chu Kỳ Sóng (250 Điểm /
+                60s)</span></h3>
+            <span id="waveCycleNumBadge"
+              class="text-[10px] text-cyan-400 font-mono tracking-wider bg-cyan-400/10 px-2 py-0.5 rounded border border-cyan-500/20">Cycle
+              #1</span>
           </div>
           <div class="flex items-center gap-2">
-            <span id="wavePointBadge" class="text-[10px] text-slate-300 font-mono bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">Point: <strong id="waveCurrentPoint" class="text-cyan-300">0</strong>/249 (<span id="waveCurrentSec">0.0s</span>)</span>
-            <span class="text-[9px] text-emerald-400 font-mono tracking-wider bg-emerald-400/10 px-1.5 py-0.5 rounded border border-emerald-500/20" data-i18n="sweepOverwrite">Quét Đè (Sweep Overwrite)</span>
+            <span id="wavePointBadge"
+              class="text-[10px] text-slate-300 font-mono bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700">Point:
+              <strong id="waveCurrentPoint" class="text-cyan-300">0</strong>/249 (<span
+                id="waveCurrentSec">0.0s</span>)</span>
+            <span
+              class="text-[9px] text-emerald-400 font-mono tracking-wider bg-emerald-400/10 px-1.5 py-0.5 rounded border border-emerald-500/20"
+              data-i18n="sweepOverwrite">Quét Đè (Sweep Overwrite)</span>
           </div>
         </div>
         <div class="p-3 flex-1 relative min-h-[220px]">
           <canvas id="waveCycleChart"></canvas>
         </div>
         <div class="px-3 pb-2 pt-0 flex items-center gap-2">
-          <span class="text-[9px] font-mono text-slate-500 whitespace-nowrap" data-i18n="chartCycleProgress">Tiến trình chu kỳ:</span>
+          <span class="text-[9px] font-mono text-slate-500 whitespace-nowrap" data-i18n="chartCycleProgress">Tiến trình
+            chu kỳ:</span>
           <div class="flex-1 h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-800/80">
-            <div id="waveCycleProgressBar" class="h-full bg-gradient-to-r from-cyan-500 via-sky-400 to-emerald-400 transition-all duration-150" style="width: 0%;"></div>
+            <div id="waveCycleProgressBar"
+              class="h-full bg-gradient-to-r from-cyan-500 via-sky-400 to-emerald-400 transition-all duration-150"
+              style="width: 0%;"></div>
           </div>
           <span id="waveCycleProgressPct" class="text-[10px] font-mono text-cyan-400 w-9 text-right">0%</span>
         </div>
@@ -282,39 +307,39 @@
         </div>
         <div class="p-4 flex flex-col gap-3">
           <div class="flex flex-col gap-1.5">
-            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="cpuUsage">Tải CPU - RPi 5</span><strong
-                id="barCpuTxt" class="text-slate-200">0.0%</strong></div>
+            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="cpuUsage">Tải CPU - RPi
+                5</span><strong id="barCpuTxt" class="text-slate-200">0.0%</strong></div>
             <div class="h-2 bg-slate-800 rounded overflow-hidden border border-slate-700/50">
               <div id="barCpuFill"
                 class="h-full bg-gradient-to-r from-sky-600 to-sky-400 w-[0%] transition-all duration-500"></div>
             </div>
           </div>
           <div class="flex flex-col gap-1.5">
-            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="memBuffer">Bộ Nhớ - Edge Buffer</span><strong
-                id="barMemTxt" class="text-slate-200">0.0%</strong></div>
+            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="memBuffer">Bộ Nhớ - Edge
+                Buffer</span><strong id="barMemTxt" class="text-slate-200">0.0%</strong></div>
             <div class="h-2 bg-slate-800 rounded overflow-hidden border border-slate-700/50">
               <div id="barMemFill"
                 class="h-full bg-gradient-to-r from-sky-600 to-sky-400 w-[0%] transition-all duration-500"></div>
             </div>
           </div>
           <div class="flex flex-col gap-1.5">
-            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="modelFootprint">Kích Thước Mô Hình - RF</span><strong
-                class="text-slate-200">4.8 MB</strong></div>
+            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="modelFootprint">Kích Thước Mô
+                Hình - RF</span><strong class="text-slate-200">4.8 MB</strong></div>
             <div class="h-2 bg-slate-800 rounded overflow-hidden border border-slate-700/50">
               <div class="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 w-[12%]"></div>
             </div>
           </div>
           <div class="flex flex-col gap-1.5">
-            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="busLoad">Tải Bus RS-485 Modbus RTU</span><strong
-                id="barBusTxt" class="text-slate-200">0.0%</strong></div>
+            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="busLoad">Tải Bus RS-485 Modbus
+                RTU</span><strong id="barBusTxt" class="text-slate-200">0.0%</strong></div>
             <div class="h-2 bg-slate-800 rounded overflow-hidden border border-slate-700/50">
               <div id="barBusFill"
                 class="h-full bg-gradient-to-r from-amber-600 to-amber-400 w-[0%] transition-all duration-500"></div>
             </div>
           </div>
           <div class="flex flex-col gap-1.5">
-            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="mqttSync">Đồng Bộ Đám Mây MQTT</span><strong
-                id="barMqttTxt" class="text-slate-200">0.0%</strong></div>
+            <div class="flex justify-between text-[11px] text-slate-400"><span data-i18n="mqttSync">Đồng Bộ Đám Mây
+                MQTT</span><strong id="barMqttTxt" class="text-slate-200">0.0%</strong></div>
             <div class="h-2 bg-slate-800 rounded overflow-hidden border border-slate-700/50">
               <div id="barMqttFill"
                 class="h-full bg-gradient-to-r from-violet-600 to-violet-400 w-[0%] transition-all duration-500"></div>
@@ -364,7 +389,8 @@
                 <td class="py-2 px-3 text-slate-400">ESP32 Node 1 - MQ136</td>
                 <td class="py-2 px-3 text-slate-200 ">Clean Air - 0.0 ppm</td>
                 <td class="py-2 px-3"><span
-                    class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-950/50 text-emerald-400 border border-emerald-500/30" data-i18n="normalStatus">Bình Thường</span>
+                    class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-950/50 text-emerald-400 border border-emerald-500/30"
+                    data-i18n="normalStatus">Bình Thường</span>
                 </td>
               </tr>
             </tbody>
@@ -396,7 +422,8 @@
         class="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"><i data-lucide="x"
           class="w-5 h-5"></i></button>
       <h3 class="text-sky-400 text-[15px] flex items-center gap-2 mb-4 border-b border-slate-800 pb-3">
-        <i data-lucide="mail" class="w-5 h-5"></i> <span data-i18n="emailTitle">Mô Phỏng Gửi Email Cảnh Báo WISE-IoT</span>
+        <i data-lucide="mail" class="w-5 h-5"></i> <span data-i18n="emailTitle">Mô Phỏng Gửi Email Cảnh Báo
+          WISE-IoT</span>
       </h3>
       <div id="emailReportContent"
         class="flex flex-col gap-2 text-[13px] text-slate-300 bg-slate-900 p-4 rounded border border-slate-800">
@@ -420,7 +447,9 @@
       }
       connectWs() {
         try {
-          this.ws = new WebSocket('ws://127.0.0.1:8001/stream');
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          const host = window.location.host || '127.0.0.1:8001';
+          this.ws = new WebSocket(`${protocol}//${host}/stream`);
           this.ws.onopen = () => {
             if (this.ws && this.ws.readyState === WebSocket.OPEN) {
               this.ws.send(JSON.stringify({ action: 'setMode', mode: this.activeMode }));

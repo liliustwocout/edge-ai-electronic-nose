@@ -49,7 +49,7 @@ def extract_window_features(w, base_v=None):
 
     b = base_v if base_v is not None else min_val
     rel_amp = max_val - b
-    ratio = max_val / max(b, 0.01)
+    ratio = max_val / max(b, 0.001)
 
     features = [mean_val, std_val, max_val, min_val, rng_val, delta_val, slope_val, diff_mean, diff_std, q75 - q25, rel_amp, ratio]
     features.extend([float(v) for v in w])
@@ -82,9 +82,9 @@ def trainModel():
         p_name = row['Pulse_Index']
         p_num = parse_pulse_num(p_name)
         points = row[point_cols].values.astype(np.float32)
-        if p_num <= 16:
+        if p_num <= 37:
             ppm, conc = 1.0, '1ppm'
-        elif p_num <= 32:
+        elif p_num <= 74:
             ppm, conc = 5.0, '5ppm'
         else:
             ppm, conc = 10.0, '10ppm'
@@ -109,9 +109,9 @@ def trainModel():
         p_name = row['Pulse_Index']
         p_num = parse_pulse_num(p_name)
         points = row[point_cols].values.astype(np.float32)
-        if p_num <= 15:
+        if p_num <= 42:
             ppm, conc = 10.0, '10ppm'
-        elif p_num <= 30:
+        elif p_num <= 84:
             ppm, conc = 50.0, '50ppm'
         else:
             ppm, conc = 100.0, '100ppm'
@@ -203,7 +203,7 @@ def trainModel():
     for _, row in h2s_df.iterrows():
         p_num = parse_pulse_num(row['Pulse_Index'])
         points = row[point_cols].values.astype(np.float32)
-        ppm = 1.0 if p_num <= 16 else (5.0 if p_num <= 32 else 10.0)
+        ppm = 1.0 if p_num <= 37 else (5.0 if p_num <= 74 else 10.0)
         is_val = (p_num % 5 == 0)
         t_X = val_win_X if is_val else win_X
         t_g = val_win_gas if is_val else win_gas
@@ -228,7 +228,7 @@ def trainModel():
     for _, row in nh3_df.iterrows():
         p_num = parse_pulse_num(row['Pulse_Index'])
         points = row[point_cols].values.astype(np.float32)
-        ppm = 10.0 if p_num <= 15 else (50.0 if p_num <= 30 else 100.0)
+        ppm = 10.0 if p_num <= 42 else (50.0 if p_num <= 84 else 100.0)
         is_val = (p_num % 5 == 0)
         t_X = val_win_X if is_val else win_X
         t_g = val_win_gas if is_val else win_gas

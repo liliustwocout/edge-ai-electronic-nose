@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 from scipy.signal import savgol_filter
@@ -6,11 +7,12 @@ import matplotlib.pyplot as plt
 
 def remove_hardware_spike(pulse, spike_start=125, search_range=15):
     """
-    Detect and remove hardware spike at ~point 125.
+    Detect and remove hardware spike at ~point 125 if present.
     The spike shoots up suddenly then decays back to the pre-spike level.
-    We find where it returns to normal, then interpolate across the gap.
     """
     pre_spike_val = pulse[spike_start - 1]  # Point_124
+    if pulse[spike_start] <= pre_spike_val + 0.05:
+        return pulse
     
     # Find where signal decays back to pre-spike level
     recovery_idx = spike_start + search_range  # default fallback
@@ -23,7 +25,6 @@ def remove_hardware_spike(pulse, spike_start=125, search_range=15):
     recovery_idx = min(recovery_idx + 2, len(pulse) - 1)
     
     # Use cubic spline interpolation across the spike region
-    # Anchor points: a few points before spike + a few points after recovery
     anchor_before = max(0, spike_start - 5)
     anchor_after = min(len(pulse), recovery_idx + 5)
     
@@ -41,8 +42,14 @@ def remove_hardware_spike(pulse, spike_start=125, search_range=15):
     return pulse
 
 
+def load_raw_dataset(path):
+    if path.endswith('.xlsx'):
+        return pd.read_excel(path)
+    return pd.read_csv(path)
+
+
 def clean_sensor_dataset(input_path, gas_name, filter_window=9, polyorder=2):
-    df = pd.read_csv(input_path)
+    df = load_raw_dataset(input_path)
     pulse_indices = df['Pulse_Index'].values
     points = df.filter(regex=r'^Point_').values  # shape: (N, 250)
     
@@ -52,11 +59,7 @@ def clean_sensor_dataset(input_path, gas_name, filter_window=9, polyorder=2):
     median_profile = np.median(points, axis=0)
     maes = np.mean(np.abs(points - median_profile), axis=1)
     threshold = np.mean(maes) + 2.5 * np.std(maes)
-    valid_mask = maes <= max(threshold, 0.08)
-    
-    # Also reject pulses with abnormally low min values
-    min_vals = np.min(points, axis=1)
-    valid_mask = valid_mask & (min_vals >= 0.35)
+    valid_mask = maes <= max(threshold, 0.12)
     
     cleaned_pulses = points[valid_mask]
     cleaned_pulse_indices = pulse_indices[valid_mask]
@@ -69,7 +72,7 @@ def clean_sensor_dataset(input_path, gas_name, filter_window=9, polyorder=2):
     for i in range(len(cleaned_pulses)):
         despike_pulses[i] = remove_hardware_spike(cleaned_pulses[i])
     
-    print(f"[{gas_name}] Step 2 - Hardware spike removed (interpolated around point 125)")
+    print(f"[{gas_name}] Step 2 - Hardware spike check completed")
     
     # === Step 3: Savitzky-Golay smoothing ===
     smoothed_pulses = np.zeros_like(despike_pulses)
@@ -88,22 +91,19 @@ def clean_sensor_dataset(input_path, gas_name, filter_window=9, polyorder=2):
 
 # === Run cleaning pipeline ===
 files = {
-    'NH3': 'data/nh3_sensor_1.csv',
-    'H2S': 'data/h2s_sensor_1.csv',
-    'Air Clean': 'data/air_clean_sensor_1.csv'
+    'NH3': ('data/nh3_1_sensor_1.xlsx' if os.path.exists('data/nh3_1_sensor_1.xlsx') else 'data/nh3_sensor_1.csv', 'data/nh3_sensor_1_clean.csv'),
+    'H2S': ('data/h2s_sensor_1.xlsx' if os.path.exists('data/h2s_sensor_1.xlsx') else 'data/h2s_sensor_1.csv', 'data/h2s_sensor_1_clean.csv'),
+    'Air Clean': ('data/clean_air_sensor_1.xlsx' if os.path.exists('data/clean_air_sensor_1.xlsx') else 'data/air_clean_sensor_1.csv', 'data/air_clean_sensor_1_clean.csv')
 }
 
 cleaned_data = {}
 raw_data = {}
 
-for name, path in files.items():
-    # Keep raw for comparison
-    raw_df = pd.read_csv(path)
+for name, (in_path, out_path) in files.items():
+    raw_df = load_raw_dataset(in_path)
     raw_data[name] = raw_df.filter(regex=r'^Point_').values
     
-    # Clean
-    clean_df, smoothed = clean_sensor_dataset(path, name)
-    out_path = path.replace('.csv', '_clean.csv')
+    clean_df, smoothed = clean_sensor_dataset(in_path, name)
     clean_df.to_csv(out_path, index=False)
     cleaned_data[name] = smoothed
     print(f"-> Saved: {out_path}")

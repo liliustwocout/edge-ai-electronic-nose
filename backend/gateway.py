@@ -1,10 +1,16 @@
 import os
 import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import json
 import time
+import pickle
 import sqlite3
 import numpy as np
-import tensorflow as tf
+
+try:
+    from backend.train import extract_window_features
+except ImportError:
+    from train import extract_window_features
 class EMAFilter:
   def __init__(self, alpha=0.2):
     self.alpha = alpha
@@ -98,7 +104,10 @@ class EdgeAIGateway:
     with open('backend/classes.json', 'r', encoding='utf-8') as f:
       meta = json.load(f)
     self.classes = meta['classes']
-    self.model = tf.keras.models.load_model('backend/model.keras')
+    with open('backend/model_gas.pkl', 'rb') as f:
+      self.clf_win = pickle.load(f)
+    with open('backend/model_ppm.pkl', 'rb') as f:
+      self.reg_win = pickle.load(f)
   def processSample(self, rawVal, temp=29.0, hum=65.0, nodeID=1):
     tStart = time.perf_counter()
     filtered = self.emaFilter.filter(rawVal)
@@ -109,29 +118,31 @@ class EdgeAIGateway:
     w = list(self.window)
     if len(w) < 20:
       w = [w[0]] * (20 - len(w)) + w
-    rawTensor = np.array(w[-20:], dtype=np.float32).reshape(1, 20, 1)
-    gasPreds, ppmPreds = self.model(rawTensor, training=False)
-    gasProbs = gasPreds.numpy()[0]
+    feat = extract_window_features(w[-20:], base_v=float(compensated))
+    featArr = np.array([feat], dtype=np.float32)
+    gasProbs = self.clf_win.predict_proba(featArr)[0]
     bestIdx = int(np.argmax(gasProbs))
     gas = self.classes[bestIdx]
     conf = round(float(gasProbs[bestIdx]), 2)
-    estimatedppm = round(float(max(0.0, ppmPreds.numpy()[0][0])), 2)
-    if gas == 'Clean Air' or compensated <= 1.015:
+    estimatedppm = round(float(max(0.0, self.reg_win.predict(featArr)[0])), 2)
+    if gas == 'Clean Air' or compensated <= 0.32:
       gas = 'Clean Air'
       estimatedppm = 0.0
       conf = max(conf, 0.98)
     risk = 'Normal'
     if gas == 'H2S':
-      if estimatedppm >= 10.0 or compensated >= 1.25:
+      if estimatedppm >= 10.0 or compensated >= 0.85:
         risk = 'Emergency'
-      elif estimatedppm >= 5.0 or compensated >= 1.10:
+      elif estimatedppm >= 5.0 or compensated >= 0.60:
         risk = 'Hazardous'
-      elif estimatedppm >= 1.0 or compensated >= 1.03:
+      elif estimatedppm >= 1.0 or compensated >= 0.40:
         risk = 'Warning'
-    elif gas == 'CO':
-      if estimatedppm >= 50.0:
+    elif gas == 'NH3':
+      if estimatedppm >= 100.0 or compensated >= 0.95:
+        risk = 'Emergency'
+      elif estimatedppm >= 50.0 or compensated >= 0.85:
         risk = 'Hazardous'
-      elif estimatedppm >= 25.0:
+      elif estimatedppm >= 25.0 or compensated >= 0.65:
         risk = 'Warning'
     latencyMs = round((time.perf_counter() - tStart) * 1000.0, 3)
     record = {
@@ -165,16 +176,16 @@ class EdgeAIGateway:
 def runBenchmark():
   gateway = EdgeAIGateway()
   sampleInputs = [
-    (1.002, 28.5, 64.0),
-    (1.001, 28.6, 64.1),
-    (1.003, 28.7, 64.2),
-    (1.015, 29.0, 64.5),
-    (1.035, 29.2, 65.0),
-    (1.070, 29.4, 65.2),
-    (1.150, 29.5, 65.5),
-    (1.280, 29.8, 66.0),
-    (1.350, 30.1, 66.5),
-    (1.420, 30.5, 67.0)
+    (0.015, 28.5, 64.0),
+    (0.020, 28.6, 64.1),
+    (0.120, 28.7, 64.2),
+    (0.350, 29.0, 64.5),
+    (0.480, 29.2, 65.0),
+    (0.650, 29.4, 65.2),
+    (0.720, 29.5, 65.5),
+    (0.850, 29.8, 66.0),
+    (0.920, 30.1, 66.5),
+    (0.980, 30.5, 67.0)
   ]
   results = []
   for raw, temp, hum in sampleInputs:

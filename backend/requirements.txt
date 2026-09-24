@@ -5,3 +5,5 @@ pandas
 numpy
 scipy
 websockets
+joblib
+openpyxl
