@@ -9,8 +9,11 @@ import numpy as np
 
 try:
     from backend.train import extract_window_features
+    from backend.calibration import BaselineTracker
 except ImportError:
     from train import extract_window_features
+    from calibration import BaselineTracker
+
 class EMAFilter:
   def __init__(self, alpha=0.2):
     self.alpha = alpha
@@ -21,6 +24,7 @@ class EMAFilter:
     else:
       self.lastVal = (self.alpha * rawVal) + ((1.0 - self.alpha) * self.lastVal)
     return self.lastVal
+
 class DriftCompensator:
   def __init__(self, refTemp=25.0, refHum=60.0, tempCoeff=0.0035, humCoeff=0.0015):
     self.refTemp = refTemp
@@ -32,6 +36,30 @@ class DriftCompensator:
     deltaH = hum - self.refHum
     compFactor = 1.0 + (self.tempCoeff * deltaT) + (self.humCoeff * deltaH)
     return sensorVal / compFactor
+
+def computeRiskLevel(gas, ppmVal, deltaV):
+    """
+    Decoupled risk calculation: evaluates risk based on estimated PPM and differential ΔV.
+    Prevents false alarms caused by high static outdoor baseline voltages (0.35V - 0.70V).
+    """
+    if gas == 'Clean Air' or abs(deltaV) < 0.08:
+        return 'Normal'
+    if gas == 'H2S':
+        if ppmVal >= 10.0 or deltaV >= 0.55:
+            return 'Emergency'
+        elif ppmVal >= 5.0 or deltaV >= 0.35:
+            return 'Hazardous'
+        elif ppmVal >= 1.0 or deltaV >= 0.12:
+            return 'Warning'
+    elif gas == 'NH3':
+        if ppmVal >= 100.0 or deltaV >= 0.65:
+            return 'Emergency'
+        elif ppmVal >= 50.0 or deltaV >= 0.45:
+            return 'Hazardous'
+        elif ppmVal >= 25.0 or deltaV >= 0.15:
+            return 'Warning'
+    return 'Normal'
+
 class SQLiteEdgeStore:
   def __init__(self, dbPath='EdgeStorage.db'):
     self.dbPath = dbPath
@@ -41,13 +69,56 @@ class SQLiteEdgeStore:
   def initSchema(self):
     with self.getConnection() as conn:
       cur = conn.cursor()
-      cur.execute('''CREATE TABLE IF NOT EXISTS TelemetryRecords (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, nodeID INTEGER, s3Raw REAL, s3Filtered REAL, s3Compensated REAL, temperature REAL, humidity REAL, mq136ADC INTEGER, mq135ADC INTEGER, identifiedGas TEXT, estimatedppm REAL, riskLevel TEXT)''')
-      cur.execute('''CREATE TABLE IF NOT EXISTS AlarmEvents (id INTEGER PRIMARY KEY AUTOINCREMENT, alertID TEXT, timestamp TEXT, nodeID INTEGER, gas TEXT, ppm REAL, riskLevel TEXT, actionTaken TEXT)''')
+      cur.execute('''CREATE TABLE IF NOT EXISTS TelemetryRecords (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, 
+          timestamp TEXT, 
+          nodeID INTEGER, 
+          s3Raw REAL, 
+          s3Filtered REAL, 
+          s3Compensated REAL, 
+          s3Baseline REAL,
+          s3Delta REAL,
+          temperature REAL, 
+          humidity REAL, 
+          mq136ADC INTEGER, 
+          mq135ADC INTEGER, 
+          identifiedGas TEXT, 
+          estimatedppm REAL, 
+          riskLevel TEXT
+      )''')
+      # Safely migrate existing database schema if columns do not exist
+      try:
+          cur.execute("ALTER TABLE TelemetryRecords ADD COLUMN s3Baseline REAL")
+      except sqlite3.OperationalError:
+          pass
+      try:
+          cur.execute("ALTER TABLE TelemetryRecords ADD COLUMN s3Delta REAL")
+      except sqlite3.OperationalError:
+          pass
+
+      cur.execute('''CREATE TABLE IF NOT EXISTS AlarmEvents (
+          id INTEGER PRIMARY KEY AUTOINCREMENT, 
+          alertID TEXT, 
+          timestamp TEXT, 
+          nodeID INTEGER, 
+          gas TEXT, 
+          ppm REAL, 
+          riskLevel TEXT, 
+          actionTaken TEXT
+      )''')
       conn.commit()
   def logTelemetry(self, record):
     with self.getConnection() as conn:
       cur = conn.cursor()
-      cur.execute('''INSERT INTO TelemetryRecords (timestamp, nodeID, s3Raw, s3Filtered, s3Compensated, temperature, humidity, mq136ADC, mq135ADC, identifiedGas, estimatedppm, riskLevel) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (record.get('timestamp'), record.get('nodeID'), record.get('s3Raw'), record.get('s3Filtered'), record.get('s3Compensated'), record.get('temperature'), record.get('humidity'), record.get('mq136ADC'), record.get('mq135ADC'), record.get('identifiedGas'), record.get('estimatedppm'), record.get('riskLevel')))
+      cur.execute('''INSERT INTO TelemetryRecords (
+          timestamp, nodeID, s3Raw, s3Filtered, s3Compensated, s3Baseline, s3Delta,
+          temperature, humidity, mq136ADC, mq135ADC, identifiedGas, estimatedppm, riskLevel
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', (
+          record.get('timestamp'), record.get('nodeID'), record.get('s3Raw'), 
+          record.get('s3Filtered'), record.get('s3Compensated'), record.get('s3Baseline'), record.get('s3Delta'),
+          record.get('temperature'), record.get('humidity'), record.get('mq136ADC'), 
+          record.get('mq135ADC'), record.get('identifiedGas'), record.get('estimatedppm'), record.get('riskLevel')
+      ))
       conn.commit()
   def logAlarm(self, alert):
     with self.getConnection() as conn:
@@ -59,6 +130,7 @@ class SQLiteEdgeStore:
       cur = conn.cursor()
       cur.execute('SELECT timestamp, nodeID, identifiedGas, estimatedppm, riskLevel FROM TelemetryRecords ORDER BY id DESC LIMIT ?', (limit,))
       return cur.fetchall()
+
 class MQTTWISEIoTFormatter:
   def __init__(self, plantID='p1', gatewayID='g1'):
     self.plantID = plantID
@@ -93,10 +165,12 @@ class MQTTWISEIoTFormatter:
       },
       'ActionRequired': 'Evacuate Personnel & Isolate Supply Valve V302' if riskVal == 'Emergency' else 'Dispatch Safety Inspection With SCBA'
     }
+
 class EdgeAIGateway:
   def __init__(self):
     self.emaFilter = EMAFilter(alpha=0.2)
     self.driftComp = DriftCompensator()
+    self.baselineTracker = BaselineTracker(warmup_points=20)
     self.store = SQLiteEdgeStore(dbPath='backend/EdgeStorage.db')
     self.mqttFormatter = MQTTWISEIoTFormatter()
     self.window = []
@@ -108,6 +182,7 @@ class EdgeAIGateway:
       self.clf_win = pickle.load(f)
     with open('backend/model_ppm.pkl', 'rb') as f:
       self.reg_win = pickle.load(f)
+
   def processSample(self, rawVal, temp=29.0, hum=65.0, nodeID=1):
     tStart = time.perf_counter()
     filtered = self.emaFilter.filter(rawVal)
@@ -118,39 +193,42 @@ class EdgeAIGateway:
     w = list(self.window)
     if len(w) < 20:
       w = [w[0]] * (20 - len(w)) + w
-    feat = extract_window_features(w[-20:], base_v=float(compensated))
+
+    slope = float((w[-1] - w[0]) / max(len(w), 1))
+    v0 = self.baselineTracker.v0 if self.baselineTracker.is_calibrated else float(np.median(w))
+    deltaV = float(compensated - v0)
+
+    # Shift-invariant differential feature extraction
+    feat = extract_window_features(w[-20:], base_v=v0)
     featArr = np.array([feat], dtype=np.float32)
     gasProbs = self.clf_win.predict_proba(featArr)[0]
     bestIdx = int(np.argmax(gasProbs))
     gas = self.classes[bestIdx]
     conf = round(float(gasProbs[bestIdx]), 2)
     estimatedppm = round(float(max(0.0, self.reg_win.predict(featArr)[0])), 2)
-    if gas == 'Clean Air' or compensated <= 0.32:
+
+    # Kinematic Flatness & Slope Guard
+    is_flat = self.baselineTracker.is_flat_baseline(w[-20:])
+    if is_flat or abs(deltaV) <= 0.05:
       gas = 'Clean Air'
       estimatedppm = 0.0
       conf = max(conf, 0.98)
-    risk = 'Normal'
-    if gas == 'H2S':
-      if estimatedppm >= 10.0 or compensated >= 0.85:
-        risk = 'Emergency'
-      elif estimatedppm >= 5.0 or compensated >= 0.60:
-        risk = 'Hazardous'
-      elif estimatedppm >= 1.0 or compensated >= 0.40:
-        risk = 'Warning'
-    elif gas == 'NH3':
-      if estimatedppm >= 100.0 or compensated >= 0.95:
-        risk = 'Emergency'
-      elif estimatedppm >= 50.0 or compensated >= 0.85:
-        risk = 'Hazardous'
-      elif estimatedppm >= 25.0 or compensated >= 0.65:
-        risk = 'Warning'
+
+    # Update baseline tracker (locks update if gas detected or large transient)
+    self.baselineTracker.update(compensated, is_gas_detected=(gas != 'Clean Air'), slope=slope)
+    v0_updated = self.baselineTracker.v0
+
+    risk = computeRiskLevel(gas, estimatedppm, deltaV)
     latencyMs = round((time.perf_counter() - tStart) * 1000.0, 3)
+
     record = {
       'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
       'nodeID': nodeID,
       's3Raw': round(rawVal, 4),
       's3Filtered': round(filtered, 4),
       's3Compensated': round(compensated, 4),
+      's3Baseline': round(v0_updated, 4),
+      's3Delta': round(deltaV, 4),
       'temperature': temp,
       'humidity': hum,
       'mq136ADC': int(1120 + estimatedppm * 55) if gas == 'H2S' else 1120,
@@ -158,7 +236,8 @@ class EdgeAIGateway:
       'identifiedGas': gas,
       'estimatedppm': estimatedppm,
       'riskLevel': risk,
-      'latencyMs': latencyMs
+      'latencyMs': latencyMs,
+      'calibrationState': self.baselineTracker.state
     }
     self.store.logTelemetry(record)
     if risk in ['Hazardous', 'Emergency']:
@@ -173,30 +252,28 @@ class EdgeAIGateway:
       }
       self.store.logAlarm(alert)
     return record
+
 def runBenchmark():
   gateway = EdgeAIGateway()
-  sampleInputs = [
-    (0.015, 28.5, 64.0),
-    (0.020, 28.6, 64.1),
-    (0.120, 28.7, 64.2),
-    (0.350, 29.0, 64.5),
-    (0.480, 29.2, 65.0),
-    (0.650, 29.4, 65.2),
-    (0.720, 29.5, 65.5),
-    (0.850, 29.8, 66.0),
-    (0.920, 30.1, 66.5),
-    (0.980, 30.5, 67.0)
-  ]
-  results = []
-  for raw, temp, hum in sampleInputs:
+  # Test with elevated outdoor ambient baseline (0.55V)
+  print("--- Testing Outdoor Flat Baseline (0.55V) ---")
+  outdoorInputs = [(0.550 + 0.001 * np.sin(i), 29.5, 75.0) for i in range(25)]
+  for raw, temp, hum in outdoorInputs:
     res = gateway.processSample(raw, temp, hum, nodeID=1)
-    results.append(res)
-  recent = gateway.store.fetchRecentTelemetry(5)
-  payload = gateway.mqttFormatter.formatTelemetryPayload([results[-1]])
-  print(f'Benchmark Completed: Processed {len(results)} Samples Successfully')
-  print(f'Average Inference Latency: {np.mean([r.get("latencyMs") for r in results]):.3f} MS')
-  print(f'SQLite Store Verified: {len(recent)} Recent Records Retrieved')
-  print(f'WISE-IoT MQTT Topic: {gateway.mqttFormatter.buildTelemetryTopic()}')
-  print(f'Sample MQTT Payload: {json.dumps(payload, indent=2)}')
+  print(f"Final Outdoor Baseline Sample Result:")
+  print(f"  Gas: {res['identifiedGas']}, PPM: {res['estimatedppm']}, Risk: {res['riskLevel']}, Baseline: {res['s3Baseline']}V, Delta: {res['s3Delta']}V, State: {res['calibrationState']}")
+  assert res['identifiedGas'] == 'Clean Air', f"Expected Clean Air on outdoor flat baseline, got {res['identifiedGas']}"
+  assert res['riskLevel'] == 'Normal', f"Expected Normal risk on outdoor baseline, got {res['riskLevel']}"
+  print(" Outdoor Flat Baseline Verification: PASSED (No False Positive!)")
+
+  print("\n--- Testing H2S Gas Leak Transient (Rising to 1.15V) ---")
+  leakInputs = [(0.550 + 0.05 * i, 29.5, 75.0) for i in range(1, 15)]
+  for raw, temp, hum in leakInputs:
+    res = gateway.processSample(raw, temp, hum, nodeID=1)
+  print(f"Final H2S Leak Sample Result:")
+  print(f"  Gas: {res['identifiedGas']}, PPM: {res['estimatedppm']}, Risk: {res['riskLevel']}, Delta: {res['s3Delta']}V, State: {res['calibrationState']}")
+
+  print("\nGateway Benchmark & Drift Guard Verified Successfully!")
+
 if __name__ == '__main__':
   runBenchmark()

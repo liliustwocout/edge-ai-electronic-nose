@@ -13,46 +13,60 @@ def parse_pulse_num(pulse_str):
     except Exception:
         return 1
 
-def extract_pulse_features(p):
+def extract_pulse_features(p, base_v=None):
+    """
+    Extract shift-invariant pulse features relative to dynamic baseline (ΔV).
+    Ensures complete robustness to elevated outdoor baselines (0.35V - 0.70V).
+    """
     p = np.array(p, dtype=np.float32)
-    v_min = float(np.min(p))
-    v_max = float(np.max(p))
-    delta_v = v_max - v_min
-    auc = float(np.sum(p))
-    mean_v = float(np.mean(p))
+    b = float(base_v) if base_v is not None else float(np.median(p[:10]))
+    p_diff = p - b
+
+    delta_v = float(np.max(p) - np.min(p))
+    auc_diff = float(np.sum(np.maximum(0.0, p_diff)))
+    mean_diff = float(np.mean(p_diff))
     std_v = float(np.std(p))
     peak_idx = int(np.argmax(p))
-    rise_slope = float((v_max - p[0]) / max(peak_idx, 1))
-    decay_slope = float((p[-1] - v_max) / max(len(p) - peak_idx, 1))
-    
-    # Key anchor samples along 60-second cycle
-    anchors = [float(p[idx]) for idx in [15, 30, 50, 75, 100, 120, 140, 170, 200, 230]]
-    
-    feat = [v_min, v_max, delta_v, auc, mean_v, std_v, float(peak_idx), rise_slope, decay_slope] + anchors
+    rise_slope = float((np.max(p) - p[0]) / max(peak_idx, 1))
+    decay_slope = float((p[-1] - np.max(p)) / max(len(p) - peak_idx, 1))
+    rel_peak = float(np.max(p) - b)
+    rel_ratio = float(rel_peak / max(b, 0.05))
+
+    # Key anchor samples along 60-second cycle relative to baseline ΔV
+    anchors_idx = [15, 30, 50, 75, 100, 120, 140, 170, 200, 230]
+    anchors_diff = [float(p[idx] - b) for idx in anchors_idx]
+
+    feat = [delta_v, auc_diff, mean_diff, std_v, float(peak_idx), rise_slope, decay_slope, rel_peak, rel_ratio] + anchors_diff
     return feat
 
 def extract_window_features(w, base_v=None):
+    """
+    Extract shift-invariant window features relative to dynamic baseline (ΔV).
+    Raw points are converted to Δw = w - b to prevent static voltage domain shift.
+    """
     w = np.array(w, dtype=np.float32)
     n = len(w)
-    mean_val = float(np.mean(w))
+    b = float(base_v) if base_v is not None else float(w[0])
+    w_diff = w - b
+
+    mean_diff = float(np.mean(w_diff))
     std_val = float(np.std(w))
-    min_val = float(np.min(w))
-    max_val = float(np.max(w))
-    rng_val = max_val - min_val
+    max_diff = float(np.max(w_diff))
+    min_diff = float(np.min(w_diff))
+    rng_val = float(np.max(w) - np.min(w))
     delta_val = float(w[-1] - w[0])
     slope_val = float(delta_val / max(n, 1))
-    q25 = float(np.percentile(w, 25))
-    q75 = float(np.percentile(w, 75))
     diffs = np.diff(w)
     diff_mean = float(np.mean(diffs)) if len(diffs) > 0 else 0.0
     diff_std = float(np.std(diffs)) if len(diffs) > 0 else 0.0
+    q_diff = float(np.percentile(w_diff, 75) - np.percentile(w_diff, 25))
 
-    b = base_v if base_v is not None else min_val
-    rel_amp = max_val - b
-    ratio = max_val / max(b, 0.001)
+    rel_amp = max_diff
+    ratio = float(max_diff / max(b, 0.05))
 
-    features = [mean_val, std_val, max_val, min_val, rng_val, delta_val, slope_val, diff_mean, diff_std, q75 - q25, rel_amp, ratio]
-    features.extend([float(v) for v in w])
+    features = [mean_diff, std_val, max_diff, min_diff, rng_val, delta_val, slope_val, diff_mean, diff_std, q_diff, rel_amp, ratio]
+    # Express all window points as relative differential Δw_i
+    features.extend([float(v) for v in w_diff])
     return features
 
 
@@ -61,6 +75,16 @@ def trainModel():
     air_df = pd.read_csv('data/air_clean_sensor_1_clean.csv')
     h2s_df = pd.read_csv('data/h2s_sensor_1_clean.csv')
     nh3_df = pd.read_csv('data/nh3_sensor_1_clean.csv')
+
+    outdoor_path = 'data/air_outdoor_clean.csv'
+    outdoor_df = pd.read_csv(outdoor_path) if os.path.exists(outdoor_path) else None
+    if outdoor_df is not None:
+        print(f"Loaded {len(outdoor_df)} real-world field outdoor clean air pulses from {outdoor_path}.")
+
+    synth_path = 'data/synthetic_outdoor_dataset_v2.csv' if os.path.exists('data/synthetic_outdoor_dataset_v2.csv') else 'data/synthetic_outdoor_dataset.csv'
+    synth_df = pd.read_csv(synth_path) if os.path.exists(synth_path) else None
+    if synth_df is not None:
+        print(f"Loaded {len(synth_df)} synthetic outdoor deployment pulses for domain adaptation from {synth_path}.")
 
     point_cols = [c for c in air_df.columns if c.startswith('Point_')]
     classes = ['Clean Air', 'H2S', 'NH3']
@@ -77,11 +101,12 @@ def trainModel():
     }
     sample_pulses = []
 
-    # Process H2S
+    # Process H2S (Lab)
     for _, row in h2s_df.iterrows():
         p_name = row['Pulse_Index']
         p_num = parse_pulse_num(p_name)
         points = row[point_cols].values.astype(np.float32)
+        base_v = float(points[0])
         if p_num <= 37:
             ppm, conc = 1.0, '1ppm'
         elif p_num <= 74:
@@ -90,7 +115,7 @@ def trainModel():
             ppm, conc = 10.0, '10ppm'
 
         profiles['H2S'][conc].append(points.tolist())
-        pulse_X.append(extract_pulse_features(points))
+        pulse_X.append(extract_pulse_features(points, base_v))
         pulse_gas.append('H2S')
         pulse_ppm.append(ppm)
         pulse_labels.append(label_map['H2S'])
@@ -104,11 +129,12 @@ def trainModel():
                 'points': [round(float(v), 4) for v in points]
             })
 
-    # Process NH3
+    # Process NH3 (Lab)
     for _, row in nh3_df.iterrows():
         p_name = row['Pulse_Index']
         p_num = parse_pulse_num(p_name)
         points = row[point_cols].values.astype(np.float32)
+        base_v = float(points[0])
         if p_num <= 42:
             ppm, conc = 10.0, '10ppm'
         elif p_num <= 84:
@@ -117,7 +143,7 @@ def trainModel():
             ppm, conc = 100.0, '100ppm'
 
         profiles['NH3'][conc].append(points.tolist())
-        pulse_X.append(extract_pulse_features(points))
+        pulse_X.append(extract_pulse_features(points, base_v))
         pulse_gas.append('NH3')
         pulse_ppm.append(ppm)
         pulse_labels.append(label_map['NH3'])
@@ -131,13 +157,14 @@ def trainModel():
                 'points': [round(float(v), 4) for v in points]
             })
 
-    # Process Clean Air
+    # Process Clean Air (Lab)
     for _, row in air_df.iterrows():
         p_name = row['Pulse_Index']
         points = row[point_cols].values.astype(np.float32)
+        base_v = float(points[0])
         ppm = 0.0
         profiles['Clean Air']['0ppm'].append(points.tolist())
-        pulse_X.append(extract_pulse_features(points))
+        pulse_X.append(extract_pulse_features(points, base_v))
         pulse_gas.append('Clean Air')
         pulse_ppm.append(ppm)
         pulse_labels.append(label_map['Clean Air'])
@@ -150,6 +177,41 @@ def trainModel():
                 'ppm': 0.0,
                 'points': [round(float(v), 4) for v in points]
             })
+
+    # Process Real-world Outdoor Clean Air Pulses (Hardware Deployment Calibration)
+    if outdoor_df is not None:
+        for _, row in outdoor_df.iterrows():
+            p_name = row['Pulse_Index']
+            points = row[point_cols].values.astype(np.float32)
+            base_v = float(points[0])
+            ppm = 0.0
+            profiles['Clean Air']['0ppm'].append(points.tolist())
+            pulse_X.append(extract_pulse_features(points, base_v))
+            pulse_gas.append('Clean Air')
+            pulse_ppm.append(ppm)
+            pulse_labels.append(label_map['Clean Air'])
+
+            if len([p for p in sample_pulses if 'Outdoor' in p.get('id', '')]) < 2:
+                sample_pulses.append({
+                    'id': f"Outdoor_{p_name}_0ppm",
+                    'name': f"Outdoor Clean Air - {p_name}",
+                    'gas': 'Clean Air',
+                    'ppm': 0.0,
+                    'points': [round(float(v), 4) for v in points]
+                })
+
+    # Process Synthetic Outdoor Data (Augmentation)
+    if synth_df is not None:
+        for _, row in synth_df.iterrows():
+            gas_name = row['Gas']
+            ppm_val = float(row['ppm'])
+            points = row[point_cols].values.astype(np.float32)
+            base_v = float(points[0])
+
+            pulse_X.append(extract_pulse_features(points, base_v))
+            pulse_gas.append(gas_name)
+            pulse_ppm.append(ppm_val)
+            pulse_labels.append(label_map[gas_name])
 
     X_pulse = np.array(pulse_X, dtype=np.float32)
     y_pulse_gas = np.array(pulse_labels, dtype=np.int32)
@@ -199,7 +261,7 @@ def trainModel():
     win_X, win_gas, win_ppm = [], [], []
     val_win_X, val_win_gas, val_win_ppm = [], [], []
 
-    # Windows from H2S
+    # Windows from H2S (Lab)
     for _, row in h2s_df.iterrows():
         p_num = parse_pulse_num(row['Pulse_Index'])
         points = row[point_cols].values.astype(np.float32)
@@ -224,7 +286,7 @@ def trainModel():
             t_g.append(label_map['Clean Air'])
             t_p.append(0.0)
 
-    # Windows from NH3
+    # Windows from NH3 (Lab)
     for _, row in nh3_df.iterrows():
         p_num = parse_pulse_num(row['Pulse_Index'])
         points = row[point_cols].values.astype(np.float32)
@@ -247,7 +309,7 @@ def trainModel():
             t_g.append(label_map['Clean Air'])
             t_p.append(0.0)
 
-    # Windows from Clean Air
+    # Windows from Clean Air (Lab)
     for _, row in air_df.iterrows():
         p_num = parse_pulse_num(row['Pulse_Index'])
         points = row[point_cols].values.astype(np.float32)
@@ -262,6 +324,53 @@ def trainModel():
             t_X.append(extract_window_features(w, base_v))
             t_g.append(label_map['Clean Air'])
             t_p.append(0.0)
+
+    # Windows from Real-world Outdoor Clean Air Data (Hardware Field Deployment)
+    if outdoor_df is not None:
+        for idx, row in outdoor_df.iterrows():
+            points = row[point_cols].values.astype(np.float32)
+            base_v = float(points[0])
+            is_val = (idx % 4 == 0)
+            t_X = val_win_X if is_val else win_X
+            t_g = val_win_gas if is_val else win_gas
+            t_p = val_win_ppm if is_val else win_ppm
+
+            for st in range(0, 230, 4 if not is_val else 6):
+                w = points[st:st + 20]
+                t_X.append(extract_window_features(w, base_v))
+                t_g.append(label_map['Clean Air'])
+                t_p.append(0.0)
+
+    # Windows from Synthetic Outdoor Data
+    if synth_df is not None:
+        for idx, row in synth_df.iterrows():
+            gas_name = row['Gas']
+            ppm_val = float(row['ppm'])
+            points = row[point_cols].values.astype(np.float32)
+            base_v = float(points[0])
+            is_val = (idx % 5 == 0)
+            t_X = val_win_X if is_val else win_X
+            t_g = val_win_gas if is_val else win_gas
+            t_p = val_win_ppm if is_val else win_ppm
+
+            if gas_name == 'Clean Air':
+                # Flat outdoor ambient baseline windows
+                for st in range(0, 230, 12 if not is_val else 18):
+                    w = points[st:st + 20]
+                    t_X.append(extract_window_features(w, base_v))
+                    t_g.append(label_map['Clean Air'])
+                    t_p.append(0.0)
+            else:
+                for st in range(25, 120, 6 if not is_val else 10):
+                    w = points[st:st + 20]
+                    t_X.append(extract_window_features(w, base_v))
+                    t_g.append(label_map[gas_name])
+                    t_p.append(ppm_val)
+                for st in [0, 220]:
+                    w = points[st:st + 20]
+                    t_X.append(extract_window_features(w, base_v))
+                    t_g.append(label_map['Clean Air'])
+                    t_p.append(0.0)
 
     X_train_win = np.array(win_X, dtype=np.float32)
     y_train_win_gas = np.array(win_gas, dtype=np.int32)
@@ -284,10 +393,10 @@ def trainModel():
     win_acc = float(np.mean(val_preds_gas == y_val_win_gas)) * 100.0
     win_mae = float(mean_absolute_error(y_val_win_ppm, val_preds_ppm))
     win_r2 = float(r2_score(y_val_win_ppm, val_preds_ppm))
-    print(f"Window Gas Accuracy: {win_acc:.2f}% | Window ppm MAE: {win_mae:.2f} ppm")
+    print(f"Window Gas Accuracy: {win_acc:.2f}% | Window ppm MAE: {win_mae:.2f} ppm | R2: {win_r2:.4f}")
 
     # Feature Importance (Top 10 from Pulse Model)
-    feature_names = ['Min_V', 'Max_V', 'Delta_V', 'AUC', 'Mean_V', 'Std_V', 'Peak_Time', 'Rise_Slope', 'Decay_Slope']
+    feature_names = ['Delta_V', 'AUC_Diff', 'Mean_Diff', 'Std_V', 'Peak_Time', 'Rise_Slope', 'Decay_Slope', 'Rel_Peak', 'Rel_Ratio']
     feature_names += [f"Anchor_{s}s" for s in [4, 7, 12, 18, 24, 29, 34, 41, 48, 55]]
     importances = clf_pulse.feature_importances_
     top_indices = np.argsort(importances)[::-1][:10]
@@ -329,7 +438,7 @@ def trainModel():
     meta = {
         'classes': classes,
         'windowSize': 20,
-        'architecture': 'RandomForest_EdgeAI_DualMode',
+        'architecture': 'RandomForest_EdgeAI_DualMode_ShiftInvariant',
         'validationMode': 'ZeroOverlapStratifiedPulseCV',
         'trainingMetrics': {
             'pulseAccuracy': round(pulse_acc, 2),
@@ -362,7 +471,7 @@ def trainModel():
         pickle.dump({'modelType': 'RandomForest_EdgeAI', 'classes': classes}, f)
 
     print("\n==========================================")
-    print(" TRAINING COMPLETED SUCCESSFULLY!")
+    print(" SHIFT-INVARIANT TRAINING COMPLETED SUCCESSFULLY!")
     print(f" Pulse Classification Accuracy: {pulse_acc:.2f}%")
     print(f" Pulse Concentration MAE:      {pulse_mae:.2f} ppm (R2: {pulse_r2:.4f})")
     print(f" Window Real-Time Accuracy:    {win_acc:.2f}%")

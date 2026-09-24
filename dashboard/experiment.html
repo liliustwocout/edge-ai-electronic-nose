@@ -104,7 +104,7 @@
         <div class="text-[15px] font-semibold tracking-tight text-white flex items-center gap-2">
           <span data-i18n="labTitle">Phòng Thực Nghiệm</span>
           <span class="text-sky-400 text-xs px-2 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/20 font-normal"
-            data-i18n="labSubtitle">Realtime Firebase</span>
+            id="labSubtitle" data-i18n="labSubtitle">RS-485 Hardware (FT232)</span>
         </div>
       </div>
     </div>
@@ -125,17 +125,32 @@
         <i data-lucide="moon" class="w-4 h-4 text-sky-300"></i>
       </button>
 
-      <!-- Firebase Live Badge -->
+      <!-- USB RS-485 Live Badge -->
       <div id="connectionBadge"
         class="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
         <span class="relative flex h-2 w-2">
           <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
           <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
         </span>
-        <span id="connectionText">RTDB Connected (210ms)</span>
+        <span id="connectionText">RS-485 /dev/ttyUSB0 (Live)</span>
       </div>
 
+      <!-- Firebase Dedicated Edge Branch Badge (Push Only) -->
+      <a href="https://console.firebase.google.com/" target="_blank" id="firebaseBranchBadge"
+        class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-950/40 border border-violet-500/30 text-violet-300 text-xs font-mono hover:bg-violet-900/40 transition-colors"
+        title="Dữ liệu đẩy 1 chiều từ RS-485 lên Firebase /edge_ai, không lấy về web">
+        <i data-lucide="cloud-upload" class="w-3.5 h-3.5 text-violet-400"></i>
+        <span>Firebase: <strong class="text-violet-200" id="firebaseBranchText">/edge_ai (Push Only)</strong></span>
+      </a>
+
       <!-- Action Buttons -->
+      <button id="btnZeroCalibrate"
+        class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-xs text-amber-300 font-medium transition-all shadow-sm active:scale-95"
+        title="Cân chỉnh đường nền ngoài trời (Zero Calibration)">
+        <i data-lucide="crosshair" class="w-3.5 h-3.5 text-amber-400"></i>
+        <span id="zeroCalLabel" data-i18n="btnZeroCalibrate">Zero Calibrate</span>
+      </button>
+
       <button id="btnPauseResume"
         class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs text-slate-300 transition-colors">
         <i data-lucide="pause" class="w-3.5 h-3.5" id="pauseIcon"></i>
@@ -171,6 +186,19 @@
           <span id="cyclePointBadge"
             class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800/80 text-sky-300 border border-slate-700">
             Point: <span id="currentPointNum" class="font-bold">0</span>/249
+          </span>
+          <span id="baselineBadge"
+            class="text-xs font-mono px-2.5 py-0.5 rounded bg-amber-950/40 text-amber-300 border border-amber-500/30 flex items-center gap-1"
+            title="Đường nền tham chiếu V0 & Độ lệch vi sai ΔV (Outdoor Drift Compensation)">
+            <span>V₀:</span> <span id="baselineValDisplay" class="font-bold text-amber-200">0.000V</span>
+            <span class="text-slate-500 mx-0.5">|</span>
+            <span>ΔV:</span> <span id="deltaValDisplay" class="font-bold text-sky-300">+0.000V</span>
+          </span>
+          <span id="flatGuardBadge"
+            class="hidden md:inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-500/30"
+            title="Chốt chặn động học dV/dt & độ phẳng đang bảo vệ chống báo động giả ngoài trời">
+            <i data-lucide="shield-check" class="w-3 h-3 text-emerald-400"></i>
+            <span id="flatGuardText">Flat Guard: Active</span>
           </span>
         </div>
         <!-- Toggles: Per Point vs Per Second & Despike & Wave Style -->
@@ -436,54 +464,58 @@
         </div>
       </div>
 
-      <!-- Column 3: Live Hardware Telemetry Packet -->
+      <!-- Column 3: Live Hardware Telemetry Packet (RS-485 USB FT232) -->
       <div
         class="rounded-xl border border-slate-800 bg-[#090f1f]/80 backdrop-blur-sm p-4 flex flex-col justify-between shadow-lg">
         <div>
           <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
             <div class="flex items-center gap-2 text-sky-400 text-xs font-semibold uppercase tracking-wider">
-              <i data-lucide="binary" class="w-4 h-4"></i>
-              <span data-i18n="hardwareTelemetry">Dữ Liệu Mạch Thu (Hardware Telemetry)</span>
+              <i data-lucide="cpu" class="w-4 h-4"></i>
+              <span>Phần Cứng Nối Tiếp (USB RS-485)</span>
             </div>
-            <span class="text-slate-500 font-mono text-[11px]" id="rawPacketRate">~4.2 Hz</span>
+            <span class="text-emerald-400 font-mono text-[11px] font-bold" id="rawPacketRate">115200 Baud</span>
           </div>
 
           <!-- Parameter Table -->
           <div class="mt-3.5 space-y-2 text-xs font-mono">
             <div class="flex items-center justify-between p-2 rounded bg-slate-950/60 border border-slate-800/50">
               <span class="text-slate-400">voltage1 (MQ136):</span>
-              <span class="text-cyan-300 font-bold" id="telemetryV1">2.59363 V</span>
+              <span class="text-cyan-300 font-bold" id="telemetryV1">0.0000 V</span>
             </div>
             <div class="flex items-center justify-between p-2 rounded bg-slate-950/60 border border-slate-800/50">
-              <span class="text-slate-400">voltage2 (Kênh Phụ):</span>
-              <span class="text-emerald-300 font-bold" id="telemetryV2">0.58513 V</span>
+              <span class="text-slate-400">Điểm chu kỳ (Point):</span>
+              <span class="text-sky-300 font-bold" id="telemetryPoint">P0 / 249</span>
             </div>
             <div class="flex items-center justify-between p-2 rounded bg-slate-950/60 border border-slate-800/50">
-              <span class="text-slate-400">sensor1 (Raw ADC):</span>
-              <span class="text-slate-200" id="telemetrySensor1">20749</span>
+              <span class="text-slate-400">Cổng thiết bị:</span>
+              <span class="text-emerald-300 font-bold">/dev/ttyUSB0 (FT232)</span>
             </div>
             <div class="flex items-center justify-between p-2 rounded bg-slate-950/60 border border-slate-800/50">
-              <span class="text-slate-400">sensor2 (Raw ADC):</span>
-              <span class="text-slate-200" id="telemetrySensor2">4681</span>
+              <span class="text-slate-400">Khung truyền mẫu:</span>
+              <span class="text-slate-200" id="telemetryFormat">Pxxx:valueV</span>
             </div>
             <div class="flex items-center justify-between p-2 rounded bg-slate-950/60 border border-slate-800/50">
-              <span class="text-slate-400">dac_voltage &bull; pulse:</span>
-              <span class="text-slate-300"><span id="telemetryDac">0.0</span>V &bull; <span
-                  id="telemetryPulse">0</span></span>
+              <span class="text-slate-400">Nguồn thu:</span>
+              <span class="text-emerald-400 font-bold flex items-center gap-1.5">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span>USB Serial Trực Tiếp</span>
+              </span>
             </div>
           </div>
         </div>
 
         <div
-          class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500">
-          <span data-i18n="targetGas">Khí Mục Tiêu:</span>
-          <select id="selectGasChannel"
-            class="bg-slate-900 border border-slate-700 text-slate-200 rounded px-2 py-0.5 text-xs focus:outline-none focus:border-sky-500">
-            <option value="CleanAir" selected>CleanAir Node</option>
-            <option value="H2S">H2S Node</option>
-            <option value="NH3">NH3 Node</option>
-            <option value="MixedAir">MixedAir Node</option>
-          </select>
+          class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
+          <span class="flex items-center gap-1.5 text-violet-300">
+            <i data-lucide="cloud-upload" class="w-3.5 h-3.5 text-violet-400"></i>
+            <span>Đẩy lên Cloud: <strong class="text-violet-200">Firebase /edge_ai</strong></span>
+          </span>
+          <span class="text-emerald-400 font-mono text-[11px] px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-500/30">
+            1-Way Push
+          </span>
         </div>
       </div>
 
@@ -1095,20 +1127,59 @@
           lucide.createIcons();
         });
 
-        // Gas Channel change
+        // Gas Channel change (if selector exists)
         const selectGas = document.getElementById('selectGasChannel');
-        selectGas.addEventListener('change', (e) => {
-          const gas = e.target.value;
-          if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({ action: 'setAirType', airType: gas }));
-          }
-          document.getElementById('channelName').innerText = gas;
-        });
+        if (selectGas) {
+          selectGas.addEventListener('change', (e) => {
+            const gas = e.target.value;
+            if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+              this.ws.send(JSON.stringify({ action: 'setAirType', airType: gas }));
+            }
+          });
+        }
 
         // Export Raw Data CSV
         document.getElementById('btnExportCsv').addEventListener('click', () => {
           this.exportRawCsv();
         });
+
+        // Zero Calibration Button
+        const btnZero = document.getElementById('btnZeroCalibrate');
+        if (btnZero) {
+          btnZero.addEventListener('click', async () => {
+            const labelEl = document.getElementById('zeroCalLabel');
+            const origText = labelEl ? labelEl.innerText : 'Zero Calibrate';
+            if (labelEl) labelEl.innerText = 'Calibrating...';
+            btnZero.classList.add('opacity-50', 'pointer-events-none');
+
+            try {
+              if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                this.ws.send(JSON.stringify({ action: 'zeroCalibrate' }));
+              }
+              const resp = await fetch('/api/calibrate/zero', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+              });
+              const res = await resp.json();
+              if (labelEl) labelEl.innerText = 'Calibrated! 🎯';
+              const baseEl = document.getElementById('baselineValDisplay');
+              if (baseEl && res.baselineVoltage !== undefined) {
+                baseEl.innerText = `${parseFloat(res.baselineVoltage).toFixed(3)}V`;
+              }
+              setTimeout(() => {
+                if (labelEl) labelEl.innerText = origText;
+                btnZero.classList.remove('opacity-50', 'pointer-events-none');
+              }, 2000);
+            } catch (err) {
+              console.error('Zero calibration error:', err);
+              if (labelEl) labelEl.innerText = 'Failed';
+              setTimeout(() => {
+                if (labelEl) labelEl.innerText = origText;
+                btnZero.classList.remove('opacity-50', 'pointer-events-none');
+              }, 2000);
+            }
+          });
+        }
 
         // Export Completed Cycles CSV
         document.getElementById('btnDownloadCyclesCsv').addEventListener('click', () => {
@@ -1130,7 +1201,9 @@
           this.ws = new WebSocket(wsUrl);
 
           this.ws.onopen = () => {
-            this.updateConnectionStatus(true, 'RTDB Connected (FastAPI Gateway)');
+            this.stopFallbackPolling();
+            this.updateConnectionStatus(true, 'RS-485 /dev/ttyUSB0 (Live)');
+            this.fetchEdgeFirebaseStatus();
           };
 
           this.ws.onmessage = (event) => {
@@ -1140,7 +1213,8 @@
               if (data.type === 'telemetry') {
                 this.handleTelemetryPacket(data);
               } else if (data.type === 'connected') {
-                this.updateConnectionStatus(true, 'RTDB Stream Live');
+                this.stopFallbackPolling();
+                this.updateConnectionStatus(true, 'RS-485 /dev/ttyUSB0 (Live)');
               }
             } catch (err) {
               console.error('Error parsing WS message', err);
@@ -1148,12 +1222,12 @@
           };
 
           this.ws.onclose = () => {
-            this.updateConnectionStatus(false, 'Disconnected (Reconnecting in 2s...)');
+            this.updateConnectionStatus(false, 'Mất Kết Nối Gateway (Thử lại sau 2s...)');
             this.retryConnect();
           };
 
           this.ws.onerror = () => {
-            this.updateConnectionStatus(false, 'Offline - Fallback Polling');
+            this.updateConnectionStatus(false, 'Ngoại Tuyến - Chuyển sang REST RS-485');
             this.startFallbackPolling();
           };
         } catch (err) {
@@ -1168,31 +1242,58 @@
         }, 2500);
       }
 
+      stopFallbackPolling() {
+        if (this.fallbackInterval) {
+          clearInterval(this.fallbackInterval);
+          this.fallbackInterval = null;
+        }
+      }
+
+      async fetchEdgeFirebaseStatus() {
+        try {
+          const resp = await fetch('/api/firebase/edge_ai/status');
+          if (resp.ok) {
+            const st = await resp.json();
+            const brEl = document.getElementById('firebaseBranchText');
+            if (brEl && st.branch) {
+              const statusDot = st.is_online ? '<span class="text-emerald-400 font-bold ml-1">● Online</span>' : '';
+              brEl.innerHTML = `/${st.branch} (Push Only) ${statusDot}`;
+            }
+          }
+        } catch (e) {}
+      }
+
       startFallbackPolling() {
-        // Fallback directly to REST /api/firebase/latest if WebSocket fails
+        // Fallback polling: Poll ONLY RS-485 hardware endpoint (/api/rs485/latest) when WS is disconnected
         if (this.fallbackInterval) return;
         this.fallbackInterval = setInterval(async () => {
           if (this.isPaused) return;
           try {
-            const resp = await fetch('/api/firebase/latest');
+            const resp = await fetch('/api/rs485/latest');
             if (resp.ok) {
               const json = await resp.json();
-              if (json.telemetry) {
-                this.handleTelemetryPacket({
-                  point: json.telemetry.point,
-                  voltage1: json.telemetry.voltage1,
-                  voltage2: json.telemetry.voltage2,
-                  telemetry: json.telemetry,
-                  inference: json.inference,
-                  timestamp: json.telemetry.timestamp
-                });
-                this.updateConnectionStatus(true, 'REST Live Stream active');
+              if (json.telemetry && json.connected) {
+                // Avoid reprocessing the exact same point if already handled
+                if (json.telemetry.point !== this.lastPoint) {
+                  this.handleTelemetryPacket({
+                    point: json.telemetry.point,
+                    voltage1: json.telemetry.voltage1,
+                    voltage2: json.telemetry.voltage2,
+                    telemetry: json.telemetry,
+                    inference: json.inference,
+                    source: 'RS485_FT232',
+                    timestamp: json.telemetry.timestamp
+                  });
+                }
+                this.updateConnectionStatus(true, 'RS-485 /dev/ttyUSB0 (Live)');
+              } else if (!json.connected) {
+                this.updateConnectionStatus(false, 'RS-485 /dev/ttyUSB0 (Mất Tín Hiệu)');
               }
             }
           } catch (e) {
-            this.updateConnectionStatus(false, 'Connection Failed');
+            this.updateConnectionStatus(false, 'Mất Kết Nối Gateway');
           }
-        }, 220);
+        }, 300);
       }
 
       updateConnectionStatus(isConnected, message) {
@@ -1235,11 +1336,27 @@
       }
 
       handleTelemetryPacket(packet) {
+        const source = packet.source || (packet.telemetry && packet.telemetry.source) || '';
+
+        // STRICT REQUIREMENT: Only display data from USB RS-485!
+        // Never display or read back Firebase cloud data on the web.
+        if (!source || !source.includes('RS485')) {
+          return;
+        }
+
         const pt = parseInt(packet.point ?? 0);
         let v1 = parseFloat(packet.voltage1 ?? 0.0);
         let v2 = parseFloat(packet.voltage2 ?? 0.0);
         const telemetry = packet.telemetry || packet;
         const inference = packet.inference || {};
+
+        this.updateConnectionStatus(true, `RS-485 /dev/ttyUSB0 (Live)`);
+        const subEl = document.getElementById('labSubtitle');
+        if (subEl) subEl.innerText = 'RS-485 Hardware (FT232)';
+        const chEl = document.getElementById('channelName');
+        if (chEl) chEl.innerText = 'RS-485 (/dev/ttyUSB0)';
+        const brEl = document.getElementById('firebaseBranchText');
+        if (brEl) brEl.innerHTML = `/edge_ai (Push Only) <span class="text-emerald-400 font-bold ml-1 animate-pulse">● Pushing</span>`;
 
         // 1. Apply hardware despike if enabled
         if (this.despikeEnabled) {
@@ -1282,8 +1399,24 @@
         // ==========================================================
         // SEAMLESS CYCLE & SMART INTERPOLATION LOGIC
         // ==========================================================
-        // Detect cycle completion: point wrapped around (e.g. from >180 back to <30) or point == 0
-        if ((this.lastPoint >= 180 && pt < 30) || (this.lastPoint > pt && pt === 0)) {
+        const isCycleWrap = (this.lastPoint >= 180 && pt < 30) || (this.lastPoint > 220 && pt === 0);
+
+        // Guard against duplicate points and backward jitter
+        if (this.lastPoint >= 0 && !isCycleWrap) {
+          if (pt === this.lastPoint) {
+            // Duplicate point: update live voltage display without re-triggering waveform progression
+            this.v1Points[pt] = v1;
+            this.updateUiTelemetry(pt, v1, v2, telemetry, inference);
+            return;
+          }
+          if (pt < this.lastPoint && (this.lastPoint - pt) < 30) {
+            // Out-of-order or backward stutter packet: discard to preserve clean forward sweep
+            return;
+          }
+        }
+
+        // Detect cycle completion: point wrapped around (from >180 back to <30)
+        if (isCycleWrap) {
           this.onCycleComplete();
           this.currentCycle += 1;
           this.cycleStartTime = new Date();
@@ -1406,6 +1539,29 @@
           telemetryStatus.className = `${this.getGasColorClass(inference.gas)} font-semibold`;
         }
 
+        // Baseline & Delta V Displays
+        const baseVal = inference.baseline !== undefined ? inference.baseline : (telemetry.s3Baseline !== undefined ? telemetry.s3Baseline : 0.0);
+        const deltaVal = inference.delta !== undefined ? inference.delta : (v1 - baseVal);
+        const baseEl = document.getElementById('baselineValDisplay');
+        const deltaEl = document.getElementById('deltaValDisplay');
+        const flatGuardEl = document.getElementById('flatGuardBadge');
+        const flatGuardText = document.getElementById('flatGuardText');
+
+        if (baseEl) baseEl.innerText = `${baseVal.toFixed(3)}V`;
+        if (deltaEl) {
+          deltaEl.innerText = `${deltaVal >= 0 ? '+' : ''}${deltaVal.toFixed(3)}V`;
+          deltaEl.className = Math.abs(deltaVal) > 0.15 ? 'font-bold text-rose-400' : 'font-bold text-sky-300';
+        }
+        if (flatGuardEl && flatGuardText) {
+          if (inference.calibrationState === 'LOCKED_EVENT' || Math.abs(deltaVal) > 0.08) {
+            flatGuardEl.className = 'hidden md:inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-rose-950/40 text-rose-400 border border-rose-500/30';
+            flatGuardText.innerText = 'Gas Event: Locked';
+          } else {
+            flatGuardEl.className = 'hidden md:inline-flex items-center gap-1 text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-950/40 text-emerald-400 border border-emerald-500/30';
+            flatGuardText.innerText = 'Flat Guard: Active';
+          }
+        }
+
         // Progress bar
         const progressPct = ((pt / 249) * 100).toFixed(0);
         const barEl = document.getElementById('cycleProgressBar');
@@ -1491,13 +1647,13 @@
           document.getElementById('featSlope').innerText = `${slope >= 0 ? '+' : ''}${slope}/s`;
         }
 
-        // Hardware Telemetry Readouts
-        document.getElementById('telemetryV1').innerText = `${v1.toFixed(5)} V`;
-        document.getElementById('telemetryV2').innerText = `${v2.toFixed(5)} V`;
-        document.getElementById('telemetrySensor1').innerText = telemetry.sensor1 || telemetry.rawSensor1 || 0;
-        document.getElementById('telemetrySensor2').innerText = telemetry.sensor2 || telemetry.rawSensor2 || 0;
-        document.getElementById('telemetryDac').innerText = (telemetry.dacVoltage || telemetry.dac_voltage || 0).toFixed(1);
-        document.getElementById('telemetryPulse').innerText = telemetry.pulse || 0;
+        // Hardware Telemetry Readouts (Live from USB RS-485 FT232)
+        const elV1 = document.getElementById('telemetryV1');
+        if (elV1) elV1.innerText = `${v1.toFixed(4)} V`;
+        const elPt = document.getElementById('telemetryPoint');
+        if (elPt) elPt.innerText = `P${pt} / 249`;
+        const elFmt = document.getElementById('telemetryFormat');
+        if (elFmt) elFmt.innerText = `P${pt}:${v1.toFixed(4)}V`;
       }
 
       getGasColorClass(gas) {

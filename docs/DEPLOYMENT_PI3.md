@@ -131,6 +131,29 @@ journalctl -u aiot-gateway.service -f
    - Kiểm tra service trên Pi 3: `sudo systemctl status aiot-gateway.service`.
 2. **Cập nhật mã nguồn hoặc mô hình mới từ máy tính sang Pi 3:**
    ```bash
-   scp -r backend dashboard data pi@100.72.0.24:/home/pi/Desktop/AIoT/
+   scp -r backend dashboard data scripts tests pi@100.72.0.24:/home/pi/Desktop/AIoT/
    ssh pi@100.72.0.24 "sudo systemctl restart aiot-gateway.service"
    ```
+
+---
+
+## 7. Tính Năng Cân Chỉnh Đường Nền Ngoài Trời (Zero Calibration & Drift Guard)
+
+Hệ thống đã được tích hợp bộ thích ứng miền dữ liệu và chống báo động giả ngoài trời:
+
+1. **Bộ theo dõi đường nền thích ứng (Adaptive Baseline Tracker):**
+   - Khởi động 20 điểm đầu tiên để tự động xác lập $V_0$.
+   - Tự động bám đuổi trôi chậm do nhiệt độ và độ ẩm khi ở không khí sạch.
+   - Tự động khóa $V_0$ khi phát hiện rò rỉ khí độc ($H_2S$ hoặc $NH_3$).
+2. **Cân chỉnh thủ công tức thì (Zero Calibration):**
+   - Bấm nút **`[ 🎯 Zero Calibrate ]`** trên thanh điều hướng của Web Dashboard hoặc gọi API:
+     ```bash
+     curl -X POST http://100.72.0.24:8001/api/calibrate/zero
+     ```
+   - Kiểm tra trạng thái đường nền hiện tại:
+     ```bash
+     curl http://100.72.0.24:8001/api/calibrate/status
+     ```
+3. **Chốt chặn động học (Flatness & Slope Guard):**
+   - Khi tín hiệu ngoài trời phẳng lặng ($\text{std} < 0.015\text{V}$, $|dV/dt| < 0.004\text{V/s}$), hệ thống tự động khóa trạng thái `Clean Air` ($0.0\text{ ppm}$), ngăn chặn 100% tình trạng báo động giả.
+

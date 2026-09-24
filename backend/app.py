@@ -14,9 +14,23 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, JSONResponse
+import threading
 from backend.train import extract_window_features, extract_pulse_features, parse_pulse_num
 from backend.calibration import BaselineTracker
 from backend.firebase import FirebaseService
+from backend.firebase_publisher import EdgeFirebasePublisher
+
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
+
+try:
+    from serial_pipeline.serial_receiver import SerialReceiver
+    from serial_pipeline.parser import PointSample
+    from serial_pipeline.config import config as serialCfg
+except ImportError:
+    SerialReceiver = None
+    PointSample = None
+    serialCfg = None
 
 classesPath = 'backend/classes.json'
 modelGasPath = 'backend/model_gas.pkl'
@@ -28,8 +42,52 @@ if not (os.path.exists(classesPath) and os.path.exists(modelGasPath) and os.path
     from backend.train import trainModel
     trainModel()
 
-firebaseService = FirebaseService()
+firebaseService = FirebaseService(enable_sse=False)
 baselineTracker = BaselineTracker(warmup_points=20)
+
+# =========================================================================
+# HARDWARE STREAM BUS (Decoupled in-memory pub/sub for USB RS-485 stream)
+# =========================================================================
+class HardwareStreamBus:
+    def __init__(self):
+        self.subscribers = []
+        self.lock = threading.Lock()
+
+    def subscribe(self, cb):
+        with self.lock:
+            if cb not in self.subscribers:
+                self.subscribers.append(cb)
+
+    def unsubscribe(self, cb):
+        with self.lock:
+            if cb in self.subscribers:
+                self.subscribers.remove(cb)
+
+    def broadcast(self, packet):
+        with self.lock:
+            subs = list(self.subscribers)
+        for s in subs:
+            try:
+                s(packet)
+            except Exception:
+                pass
+
+hardwareBus = HardwareStreamBus()
+
+# =========================================================================
+# RS-485 HARDWARE & FIREBASE EDGE PUBLISHER STATE
+# =========================================================================
+rs485Receiver = None
+edgePublisher = None
+last_rs485_rx_time = 0.0
+last_rs485_inf_time = 0.0
+rs485_latest = None
+rs485_latest_inference = None
+rs485_lock = threading.Lock()
+rs485_window = []
+rs485_cycle_points = [None] * 250
+rs485_cycle_count = 1
+rs485_last_point = -1
 
 app = FastAPI(title="Electronic Nose Edge AI Gateway")
 app.add_middleware(
@@ -300,6 +358,116 @@ def runPulseInference(points):
 
 
 # =========================================================================
+# RS-485 SERIAL RECEIVER & DEDICATED FIREBASE PUBLISHER (/edge_ai)
+# =========================================================================
+def on_rs485_sample(sample: PointSample):
+    global last_rs485_rx_time, rs485_latest, rs485_latest_inference
+    global rs485_cycle_count, rs485_last_point, rs485_cycle_points
+    global last_rs485_inf_time
+    now_ts = time.time()
+    last_rs485_rx_time = now_ts
+    port_name = getattr(serialCfg.serial, 'port', '/dev/ttyUSB0') if serialCfg else '/dev/ttyUSB0'
+    pt = sample.point
+    v1 = sample.voltage1
+
+    # 0. Anti-stutter filter: Prevent backward duplicate packets from FreeRTOS/UART FIFO jitter
+    is_wrap_around = (rs485_last_point >= 180 and pt < 30) or (rs485_last_point > 200 and pt == 0)
+    if rs485_last_point >= 0 and not is_wrap_around:
+        if pt == rs485_last_point:
+            # Duplicate point sample: update latest voltage in-place and return
+            with rs485_lock:
+                if rs485_latest:
+                    rs485_latest['voltage1'] = v1
+            return
+        elif pt < rs485_last_point and (rs485_last_point - pt) < 30:
+            # Backward stutter packet (e.g. at 86, receives 84 or 85): discard to keep monotonic progression
+            return
+
+    # 1. Update rolling window (20 samples) for real-time window inference
+    rs485_window.append(v1)
+    if len(rs485_window) > 20:
+        rs485_window.pop(0)
+
+    # 2. Run real-time Edge AI inference (throttled to at most 5Hz / every 200ms to preserve Pi 3 CPU)
+    if (now_ts - last_rs485_inf_time >= 0.20) or (rs485_latest_inference is None):
+        try:
+            inf = runInference(rs485_window, v1)
+            last_rs485_inf_time = now_ts
+        except Exception as e:
+            inf = rs485_latest_inference
+    else:
+        inf = rs485_latest_inference
+
+    # 3. Store point into current 250-point cycle buffer
+    if 0 <= pt < 250:
+        rs485_cycle_points[pt] = v1
+
+    # 4. Check for completed wave cycle (wrap-around from end to beginning)
+    cycleSummary = None
+    if is_wrap_around:
+        valid_pts = [p for p in rs485_cycle_points if p is not None]
+        if len(valid_pts) >= 100:
+            fill_val = float(np.mean(valid_pts))
+            full_p = [p if p is not None else fill_val for p in rs485_cycle_points]
+            try:
+                cycleSummary = runPulseInference(full_p)
+                if cycleSummary and edgePublisher:
+                    cycleSummary['cycleNumber'] = rs485_cycle_count
+                    cycleSummary['pointsCount'] = len(valid_pts)
+                    edgePublisher.push_cycle_summary(cycleSummary)
+            except Exception:
+                pass
+        rs485_cycle_count += 1
+        rs485_cycle_points = [None] * 250
+
+    rs485_last_point = pt
+
+    pkt = {
+        'point': pt,
+        'voltage1': v1,
+        'voltage2': 0.0,
+        'sensor1': int(v1 * 1000),
+        'sensor2': 0,
+        'rawSensor1': int(v1 * 1000),
+        'rawSensor2': 0,
+        'pulse': 0,
+        'dacVoltage': 0.0,
+        'waveType': 0,
+        'gasType': inf.get('gas', 'Clean Air') if inf else 'Clean Air',
+        'ppm': inf.get('estimatedppm', 0.0) if inf else 0.0,
+        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+        'source': 'RS485_FT232',
+        'port': port_name,
+        'cycle': rs485_cycle_count,
+        'inference': inf,
+        'cycleSummary': cycleSummary
+    }
+    with rs485_lock:
+        rs485_latest = pkt
+        rs485_latest_inference = inf
+
+    # 5. Asynchronously push to dedicated Firebase branch (/edge_ai)
+    if edgePublisher:
+        edgePublisher.push_sample(pkt, inference=inf, cycle_idx=rs485_cycle_count)
+
+    # 6. Immediately notify WebSocket subscribers (dashboard/experiment.html)
+    hardwareBus.broadcast(pkt)
+
+# Start Edge Firebase Publisher (streams to /edge_ai branch)
+edgePublisher = EdgeFirebasePublisher(branch='edge_ai', min_push_interval_sec=0.25)
+edgePublisher.start()
+
+# Start Serial Receiver
+if SerialReceiver is not None and serialCfg is not None:
+    try:
+        rs485Receiver = SerialReceiver(cfg=serialCfg.serial, on_sample_callback=on_rs485_sample)
+        rs485Receiver.start()
+        print(f"[Gateway] RS-485 Serial Receiver active on {serialCfg.serial.port} ({serialCfg.serial.baudrate} baud).")
+    except Exception as e:
+        print(f"[Gateway] RS-485 Serial Receiver init notice: {e}")
+
+
+# =========================================================================
 # REST API ENDPOINTS
 # =========================================================================
 @app.get('/health')
@@ -348,13 +516,15 @@ async def zeroCalibrate(req: Request = None):
             target_v = body.get('targetVoltage')
         except Exception:
             pass
-    latest = firebaseService.getLatest()
+    is_rs485_active = (time.time() - last_rs485_rx_time < 5.0) if last_rs485_rx_time > 0 else False
+    latest = rs485_latest if is_rs485_active else firebaseService.getLatest()
     recent = [float(latest.get('voltage1', 0.55))] if latest else None
     new_v0 = baselineTracker.recalibrate(recent_samples=recent, target_val=target_v)
     return {
         'status': 'ok',
         'baselineVoltage': round(new_v0, 4),
         'state': baselineTracker.state,
+        'source': 'RS485' if is_rs485_active else 'Firebase',
         'message': f'Zero calibration successful. Baseline anchored at {new_v0:.4f}V.'
     }
 
@@ -362,21 +532,47 @@ async def zeroCalibrate(req: Request = None):
 def getCalibrateStatus():
     return baselineTracker.get_status()
 
+@app.get('/api/rs485/status')
+def getRs485Status():
+    is_active = (time.time() - last_rs485_rx_time < 4.0) if last_rs485_rx_time > 0 else False
+    port_name = getattr(serialCfg.serial, 'port', '/dev/ttyUSB0') if serialCfg else '/dev/ttyUSB0'
+    baud_rate = getattr(serialCfg.serial, 'baudrate', 115200) if serialCfg else 115200
+    return {
+        'connected': rs485Receiver.is_connected if rs485Receiver else False,
+        'active': is_active,
+        'port': port_name,
+        'baudrate': baud_rate,
+        'lastSeenSecondsAgo': round(time.time() - last_rs485_rx_time, 1) if last_rs485_rx_time > 0 else None,
+        'latestSample': rs485_latest,
+        'telemetry': rs485Receiver.get_telemetry() if rs485Receiver else None
+    }
+
 @app.get('/api/firebase/status')
 def getFirebaseStatus():
     return firebaseService.getStatus()
 
 @app.get('/api/firebase/latest')
 def getFirebaseLatest():
-    latest = firebaseService.getLatest()
-    if latest:
-        v1 = float(latest.get('voltage1', 1.0))
-        inf = runInference([v1] * 20, v1)
+    with rs485_lock:
+        if rs485_latest:
+            return {
+                'telemetry': rs485_latest,
+                'source': 'RS485_FT232',
+                'inference': rs485_latest_inference
+            }
+        return {'telemetry': None, 'inference': None, 'source': 'RS485_Waiting'}
+
+@app.get('/api/rs485/latest')
+def getRs485Latest():
+    with rs485_lock:
+        is_active = (time.time() - last_rs485_rx_time < 5.0) if last_rs485_rx_time > 0 else False
         return {
-            'telemetry': latest,
-            'inference': inf
+            'telemetry': rs485_latest,
+            'inference': rs485_latest_inference,
+            'connected': rs485Receiver.is_connected if rs485Receiver else False,
+            'active': is_active,
+            'lastSeenSecondsAgo': round(time.time() - last_rs485_rx_time, 1) if last_rs485_rx_time > 0 else None
         }
-    return {'telemetry': None, 'inference': None}
 
 @app.post('/api/firebase/air_type')
 async def setFirebaseAir(req: Request):
@@ -390,6 +586,26 @@ def flushFirebase():
     firebaseService.flushDisk()
     return {'status': 'ok', 'message': 'Buffer flushed to disk'}
 
+@app.get('/api/firebase/edge_ai/status')
+def getEdgeFirebaseStatus():
+    return edgePublisher.get_status() if edgePublisher else {'enabled': False}
+
+@app.get('/api/firebase/edge_ai/latest')
+def getEdgeFirebaseLatest():
+    return {
+        'telemetry': rs485_latest,
+        'inference': rs485_latest_inference,
+        'branch': edgePublisher.branch if edgePublisher else 'edge_ai',
+        'publisher': edgePublisher.get_status() if edgePublisher else None
+    }
+
+@app.on_event("shutdown")
+def shutdownGateway():
+    if edgePublisher:
+        edgePublisher.stop()
+    if rs485Receiver:
+        rs485Receiver.stop()
+
 @app.websocket('/ws/live_experiment')
 async def liveExperimentWs(ws: WebSocket):
     await ws.accept()
@@ -402,14 +618,7 @@ async def liveExperimentWs(ws: WebSocket):
         except Exception:
             pass
 
-    firebaseService.subscribe(onPacket)
-
-    state = {
-        'recentWindow': [],
-        'cyclePoints': [None] * 250,
-        'cycleCount': 1,
-        'lastPoint': -1
-    }
+    hardwareBus.subscribe(onPacket)
 
     async def listenClient():
         try:
@@ -417,11 +626,7 @@ async def liveExperimentWs(ws: WebSocket):
                 msg = await ws.receive_text()
                 cmd = json.loads(msg)
                 action = cmd.get('action')
-                if action == 'setAirType':
-                    firebaseService.setAirType(cmd.get('airType', 'CleanAir'))
-                elif action == 'flush':
-                    firebaseService.flushDisk()
-                elif action == 'zeroCalibrate':
+                if action == 'zeroCalibrate':
                     baselineTracker.recalibrate()
         except Exception:
             pass
@@ -429,7 +634,15 @@ async def liveExperimentWs(ws: WebSocket):
     listenTask = asyncio.create_task(listenClient())
 
     try:
-        init_st = firebaseService.getStatus()
+        port_name = getattr(serialCfg.serial, 'port', '/dev/ttyUSB0') if serialCfg else '/dev/ttyUSB0'
+        baud_rate = getattr(serialCfg.serial, 'baudrate', 115200) if serialCfg else 115200
+        init_st = {
+            'source': 'RS485_FT232',
+            'port': port_name,
+            'baudrate': baud_rate,
+            'connected': rs485Receiver.is_connected if rs485Receiver else False,
+            'firebase_push_branch': 'edge_ai'
+        }
         await ws.send_text(json.dumps({
             'type': 'connected',
             'status': init_st,
@@ -441,30 +654,13 @@ async def liveExperimentWs(ws: WebSocket):
             pt = int(packet.get('point', 0))
             v1 = float(packet.get('voltage1', 0.0))
             v2 = float(packet.get('voltage2', 0.0))
-
-            cycleSummary = None
-            if state['lastPoint'] >= 200 and pt < 30:
-                state['cycleCount'] += 1
-                valid_pts = [p for p in state['cyclePoints'] if p is not None]
-                if len(valid_pts) >= 150:
-                    fill_val = float(np.mean(valid_pts))
-                    full_p = [p if p is not None else fill_val for p in state['cyclePoints']]
-                    cycleSummary = runPulseInference(full_p)
-                state['cyclePoints'] = [None] * 250
-
-            state['lastPoint'] = pt
-            if 0 <= pt < 250:
-                state['cyclePoints'][pt] = v1
-
-            state['recentWindow'].append(v1)
-            if len(state['recentWindow']) > 20:
-                state['recentWindow'].pop(0)
-
-            win_inf = runInference(state['recentWindow'], v1)
+            win_inf = packet.get('inference') or {}
+            cycleSummary = packet.get('cycleSummary')
 
             response = {
                 'type': 'telemetry',
-                'cycle': state['cycleCount'],
+                'source': 'RS485_FT232',
+                'cycle': packet.get('cycle', 1),
                 'point': pt,
                 'voltage1': v1,
                 'voltage2': v2,
@@ -480,7 +676,7 @@ async def liveExperimentWs(ws: WebSocket):
     except WebSocketDisconnect:
         pass
     finally:
-        firebaseService.unsubscribe(onPacket)
+        hardwareBus.unsubscribe(onPacket)
         listenTask.cancel()
 
 

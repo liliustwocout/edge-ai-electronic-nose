@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional, List, Callable
 DEFAULT_RTDB_URL = 'https://enose-1aeb7-default-rtdb.asia-southeast1.firebasedatabase.app/sensor/latest.json?auth=qbtMtFdVKPlt5kBvQoD7ELUITrqs1qoPPuNmgQ0y'
 
 class FirebaseService:
-    def __init__(self, primary_url: str = DEFAULT_RTDB_URL):
+    def __init__(self, primary_url: str = DEFAULT_RTDB_URL, enable_sse: bool = False):
         self.dbUrls = {
             'CleanAir': primary_url,
             'H2S': 'https://enose-h2s-default-rtdb.asia-southeast1.firebasedatabase.app/sensor/latest.json?auth=qbtMtFdVKPlt5kBvQoD7ELUITrqs1qoPPuNmgQ0y',
@@ -19,6 +19,7 @@ class FirebaseService:
             'MixedAir': primary_url
         }
         self.activeAir = 'CleanAir'
+        self.enable_sse = enable_sse
         self.connectionStatus: Dict[str, Dict[str, Any]] = {}
         self.ramBuffers: Dict[str, List[Dict[str, Any]]] = {g: [] for g in self.dbUrls.keys()}
         self.csvFiles = {g: f'data/{g}_live.csv' for g in self.dbUrls.keys()}
@@ -28,17 +29,20 @@ class FirebaseService:
         self.running = True
         self.lock = threading.Lock()
         self.subscribers: List[Callable[[Dict[str, Any]], None]] = []
-        
-        # Initial connection test
-        self.checkAllConnections()
+        self.is_hardware_active: Optional[Callable[[], bool]] = None
         
         self.currentResp = None
-        self.streamThread = threading.Thread(target=self.sseStreamLoop, daemon=True)
-        self.streamThread.start()
-        
-        # Periodic connection checker
-        self.connThread = threading.Thread(target=self.connectionCheckLoop, daemon=True)
-        self.connThread.start()
+        self.streamThread = None
+        self.connThread = None
+
+        if self.enable_sse:
+            # Initial connection test
+            self.checkAllConnections()
+            self.streamThread = threading.Thread(target=self.sseStreamLoop, daemon=True)
+            self.streamThread.start()
+            # Periodic connection checker
+            self.connThread = threading.Thread(target=self.connectionCheckLoop, daemon=True)
+            self.connThread.start()
 
     def subscribe(self, callback: Callable[[Dict[str, Any]], None]):
         with self.lock:
@@ -183,6 +187,9 @@ class FirebaseService:
                                         pt = int(raw_data.get('point', 0))
                                         v1 = float(raw_data.get('voltage1', 0.0))
                                         if pt != last_pt or abs(v1 - last_v1) > 1e-5:
+                                            # If physical RS-485 hardware is actively streaming, don't mix cloud packets
+                                            if self.is_hardware_active and self.is_hardware_active():
+                                                continue
                                             last_pt = pt
                                             last_v1 = v1
                                             parsed = self.parseGasPacket(raw_data, gasName)
