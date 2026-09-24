@@ -764,6 +764,60 @@ body.edit-mode [contenteditable="true"]:hover {
 }
 
 /* --------------------------------------------------------------------------
+   RESPONSIVE MOBILE STYLING (FOR VIEWPORTS <= 768px)
+   -------------------------------------------------------------------------- */
+@media screen and (max-width: 768px) {
+  body {
+    padding: 108px 8px 30px 8px;
+    overflow-x: hidden;
+  }
+
+  .standee-toolbar {
+    height: auto;
+    padding: 8px 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  }
+
+  .toolbar-brand {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    gap: 8px;
+  }
+
+  .toolbar-brand span:first-child {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .toolbar-actions {
+    display: flex;
+    overflow-x: auto;
+    white-space: nowrap;
+    gap: 6px;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .toolbar-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tb-btn {
+    flex-shrink: 0;
+    padding: 5px 9px;
+    font-size: 11px;
+    border-radius: 4px;
+  }
+}
+
+/* --------------------------------------------------------------------------
    PRINT STYLING (FOR 80cm x 180cm BANNER OUTPUT)
    -------------------------------------------------------------------------- */
 @media print {

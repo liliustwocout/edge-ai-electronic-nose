@@ -15,6 +15,9 @@
       darkMode: 'class',
       theme: {
         extend: {
+          screens: {
+            xs: '440px',
+          },
           fontFamily: {
             sans: ['Outfit', 'sans-serif'],
             mono: ['JetBrains Mono', 'monospace'],
@@ -61,32 +64,32 @@
 
   <!-- TOP HEADER -->
   <header class="border-b border-slate-800/80 bg-slate-950/70 backdrop-blur-md sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-cyan-400 p-[1px] flex items-center justify-center shadow-lg shadow-sky-500/20">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5 sm:gap-3 min-w-0">
+        <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-cyan-400 p-[1px] flex items-center justify-center shadow-lg shadow-sky-500/20 shrink-0">
           <div class="w-full h-full bg-slate-950 rounded-[11px] flex items-center justify-center">
-            <i data-lucide="activity" class="w-5 h-5 text-sky-400"></i>
+            <i data-lucide="activity" class="w-4 h-4 sm:w-5 sm:h-5 text-sky-400"></i>
           </div>
         </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <span class="font-bold text-base tracking-wide text-white">E-NOSE EDGE AI</span>
-            <span class="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-sky-950/80 text-sky-400 border border-sky-500/30">Advantech InnoWorks</span>
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5 sm:gap-2">
+            <span class="font-bold text-sm sm:text-base tracking-wide text-white truncate">E-NOSE EDGE AI</span>
+            <span class="text-[9px] sm:text-[10px] uppercase tracking-wider font-semibold px-1.5 sm:px-2 py-0.5 rounded-full bg-sky-950/80 text-sky-400 border border-sky-500/30 whitespace-nowrap hidden sm:inline-block">Advantech InnoWorks</span>
           </div>
-          <p class="text-xs text-slate-400 font-mono">Phenikaa University × TaskForce141</p>
+          <p class="text-[11px] sm:text-xs text-slate-400 font-mono truncate">Phenikaa University × TaskForce141</p>
         </div>
       </div>
 
-      <!-- EDGE GATEWAY LIVE BADGE -->
-      <div class="flex items-center gap-3">
-        <div id="cloudStatusBadge" class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900 border border-slate-700/60 text-xs">
-          <span class="relative flex h-2 w-2">
+      <!-- EDGE GATEWAY LIVE BADGE & LINKS -->
+      <div class="flex items-center gap-1.5 sm:gap-3 shrink-0">
+        <div id="cloudStatusBadge" class="flex items-center gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full bg-slate-900 border border-slate-700/60 text-xs">
+          <span class="relative flex h-2 w-2 shrink-0">
             <span id="pingDot" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span id="statusDot" class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
-          <span class="text-slate-300 font-mono text-[11px]" id="statusText">Kết nối Cloud: Đang nạp...</span>
+          <span class="text-slate-300 font-mono text-[10px] sm:text-[11px] hidden xs:inline" id="statusText">Cloud: Live</span>
         </div>
-        <a href="https://github.com/liliustwocout/edge-ai-electronic-nose" target="_blank" class="p-2 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-colors">
+        <a href="https://github.com/liliustwocout/edge-ai-electronic-nose" target="_blank" class="p-1.5 sm:p-2 rounded-lg bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 transition-colors" title="GitHub Repository">
           <i data-lucide="github" class="w-4 h-4"></i>
         </a>
       </div>
@@ -268,29 +271,43 @@
       const pingDot = document.getElementById('pingDot');
       const statusDot = document.getElementById('statusDot');
 
+      function updateUI(data) {
+        if (!data || !data.inference) return;
+        if (statusText) statusText.innerText = `Firebase Cloud: Trực Tiếp (${data.source || 'RS-485'})`;
+        if (liveGas) {
+          liveGas.innerText = data.inference.gas || 'Clean Air';
+          if (data.inference.gas === 'H2S') liveGas.className = 'text-red-400 font-semibold';
+          else if (data.inference.gas === 'NH3') liveGas.className = 'text-orange-400 font-semibold';
+          else liveGas.className = 'text-emerald-400 font-semibold';
+        }
+        if (liveConfidence) liveConfidence.innerText = `${Math.round(data.inference.confidence || 90)}%`;
+        if (liveTime && data.timestamp) liveTime.innerText = data.timestamp.split(' ')[1] || 'Vừa xong';
+        if (liveDevice && data.device) liveDevice.innerText = data.device.replace(' (Edge Gateway)', '');
+        if (statusDot) statusDot.className = 'relative inline-flex rounded-full h-2 w-2 bg-emerald-500';
+        if (pingDot) pingDot.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
+      }
+
+      // Initial snapshot fetch for instant load
+      fetch(FIREBASE_URL)
+        .then(r => r.json())
+        .then(d => updateUI(d))
+        .catch(() => {});
+
       try {
         const sse = new EventSource(FIREBASE_URL);
 
-        sse.onmessage = (event) => {
+        const onEvent = (event) => {
           try {
             const res = JSON.parse(event.data);
-            const data = res.data || res;
-            if (data && data.inference) {
-              if (statusText) statusText.innerText = `Firebase Cloud: Trực Tiếp (${data.source || 'RS-485'})`;
-              if (liveGas) {
-                liveGas.innerText = data.inference.gas || 'Clean Air';
-                if (data.inference.gas === 'H2S') liveGas.className = 'text-red-400 font-semibold';
-                else if (data.inference.gas === 'NH3') liveGas.className = 'text-orange-400 font-semibold';
-                else liveGas.className = 'text-emerald-400 font-semibold';
-              }
-              if (liveConfidence) liveConfidence.innerText = `${Math.round(data.inference.confidence || 90)}%`;
-              if (liveTime && data.timestamp) liveTime.innerText = data.timestamp.split(' ')[1] || 'Vừa xong';
-              if (liveDevice && data.device) liveDevice.innerText = data.device.replace(' (Edge Gateway)', '');
-              if (statusDot) statusDot.className = 'relative inline-flex rounded-full h-2 w-2 bg-emerald-500';
-              if (pingDot) pingDot.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
-            }
+            const data = (res && res.data !== undefined) ? res.data : res;
+            updateUI(data);
           } catch (err) {}
         };
+
+        // Firebase sends named events 'put' and 'patch'
+        sse.addEventListener('put', onEvent);
+        sse.addEventListener('patch', onEvent);
+        sse.onmessage = onEvent;
 
         sse.onerror = () => {
           if (statusText) statusText.innerText = 'Firebase Cloud: Đang kết nối lại...';

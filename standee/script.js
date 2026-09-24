@@ -277,8 +277,12 @@ function initZoomControls() {
   }
 
   function fitScreen() {
-    const availHeight = window.innerHeight - 90;
-    const scale = Math.min(availHeight / 1890, 1);
+    const isMobile = window.innerWidth <= 768;
+    const topMargin = isMobile ? 120 : 90;
+    const sideMargin = isMobile ? 16 : 40;
+    const availHeight = Math.max(window.innerHeight - topMargin, 200);
+    const availWidth = Math.max(window.innerWidth - sideMargin, 200);
+    const scale = Math.min(availHeight / 1890, availWidth / 840, 1);
     applyZoom(scale);
     if (btnFit) btnFit.classList.add('active');
   }
@@ -288,9 +292,13 @@ function initZoomControls() {
   if (btn75) btn75.addEventListener('click', () => applyZoom(0.75));
   if (btn100) btn100.addEventListener('click', () => applyZoom(1));
 
-  if (window.innerHeight < 1900) {
-    fitScreen();
-  }
+  fitScreen();
+
+  window.addEventListener('resize', () => {
+    if (btnFit && btnFit.classList.contains('active')) {
+      fitScreen();
+    }
+  });
 }
 
 /* --------------------------------------------------------------------------

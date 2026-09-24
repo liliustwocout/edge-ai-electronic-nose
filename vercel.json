@@ -5,8 +5,11 @@
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
     { "source": "/dashboard", "destination": "/dashboard/index.html" },
+    { "source": "/dashboard/index", "destination": "/dashboard/index.html" },
+    { "source": "/dashboard/experiment", "destination": "/dashboard/experiment.html" },
     { "source": "/experiment", "destination": "/dashboard/experiment.html" },
-    { "source": "/standee", "destination": "/standee/index.html" }
+    { "source": "/standee", "destination": "/standee/index.html" },
+    { "source": "/standee/index", "destination": "/standee/index.html" }
   ],
   "headers": [
     {
