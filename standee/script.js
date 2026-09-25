@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initZoomControls();
   initLiveEditMode();
   initPrintHandler();
+  initCleanCaptureMode();
 });
 
 /* --------------------------------------------------------------------------
@@ -28,8 +29,9 @@ function initWaveCycleCanvas() {
   const w = rect.width;
   const h = rect.height;
 
-  // Clean light canvas background
-  ctx.fillStyle = '#ffffff';
+  // Clean light translucent canvas background
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.80)';
   ctx.fillRect(0, 0, w, h);
 
   // Subtle grid lines
@@ -310,9 +312,12 @@ function initLiveEditMode() {
   const btnReset = document.getElementById('btnReset');
   const standeeCanvas = document.getElementById('standeeCanvas');
 
-  // Restore saved content
+  // Restore saved content only if valid and matching report-compliant version
+  const currentVersion = "v3.9_esc_only_clean_capture";
+  const savedVersion = localStorage.getItem('standee_version');
   const savedContent = localStorage.getItem('standee_light_html');
-  if (savedContent && standeeCanvas) {
+
+  if (savedVersion === currentVersion && savedContent && standeeCanvas) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(savedContent, 'text/html');
     const restoredContent = doc.querySelector('.standee-content');
@@ -321,6 +326,10 @@ function initLiveEditMode() {
       currentContent.innerHTML = restoredContent.innerHTML;
       initWaveCycleCanvas();
     }
+  } else if (savedVersion !== currentVersion) {
+    // Clear outdated cache to ensure strict adherence to report.docx
+    localStorage.removeItem('standee_light_html');
+    localStorage.setItem('standee_version', currentVersion);
   }
 
   let isEditing = false;
@@ -329,7 +338,7 @@ function initLiveEditMode() {
       isEditing = !isEditing;
       document.body.classList.toggle('edit-mode', isEditing);
       btnEdit.classList.toggle('active', isEditing);
-      btnEdit.innerText = isEditing ? 'Dang sua (Nhan de tat)' : 'Che do sua chu';
+      btnEdit.innerText = isEditing ? 'Editing (Click to exit)' : 'Edit Text Mode';
 
       const editableElements = standeeCanvas.querySelectorAll('h1, h2, h3, h4, p, span, li, td, th, strong');
       editableElements.forEach(el => {
@@ -344,14 +353,14 @@ function initLiveEditMode() {
     btnSave.addEventListener('click', () => {
       if (standeeCanvas) {
         localStorage.setItem('standee_light_html', standeeCanvas.innerHTML);
-        alert('Da luu thanh cong noi dung vao trinh duyet!');
+        alert('Changes saved successfully to browser storage!');
       }
     });
   }
 
   if (btnReset) {
     btnReset.addEventListener('click', () => {
-      if (confirm('Ban co chac chan muon khoi phuc lai noi dung goc ban dau?')) {
+      if (confirm('Are you sure you want to reset all content back to original?')) {
         localStorage.removeItem('standee_light_html');
         window.location.reload();
       }
@@ -360,24 +369,77 @@ function initLiveEditMode() {
 }
 
 /* --------------------------------------------------------------------------
-   5. PRINT / EXPORT PDF HANDLER
+   5. PRINT / EXPORT PDF HANDLER (Supports both button and Ctrl+P)
    -------------------------------------------------------------------------- */
 function initPrintHandler() {
   const btnPrint = document.getElementById('btnPrint');
-  if (!btnPrint) return;
+  const viewport = document.getElementById('standeeViewport');
 
-  btnPrint.addEventListener('click', () => {
-    const viewport = document.getElementById('standeeViewport');
-    const prevTransform = viewport.style.transform;
-    const prevMargin = viewport.style.marginBottom;
-    viewport.style.transform = 'none';
-    viewport.style.marginBottom = '0';
+  let prevTransform = '';
+  let prevMargin = '';
 
-    window.print();
+  function prepareForPrint() {
+    if (viewport) {
+      prevTransform = viewport.style.transform;
+      prevMargin = viewport.style.marginBottom;
+      viewport.style.transform = 'none';
+      viewport.style.marginBottom = '0';
+    }
+  }
 
-    setTimeout(() => {
+  function restoreAfterPrint() {
+    if (viewport) {
       viewport.style.transform = prevTransform;
       viewport.style.marginBottom = prevMargin;
-    }, 500);
+    }
+  }
+
+  window.addEventListener('beforeprint', prepareForPrint);
+  window.addEventListener('afterprint', restoreAfterPrint);
+
+  if (btnPrint) {
+    btnPrint.addEventListener('click', () => {
+      window.print();
+    });
+  }
+}
+
+/* --------------------------------------------------------------------------
+   6. CLEAN CAPTURE MODE (HIDES TOOLBAR & PAGE PADDING FOR 2K/4K EXPORT)
+   -------------------------------------------------------------------------- */
+function initCleanCaptureMode() {
+  const btnClean = document.getElementById('btnCleanMode');
+  const viewport = document.getElementById('standeeViewport');
+
+  let savedZoomTransform = '';
+  let savedZoomMargin = '';
+
+  function enterCleanMode() {
+    if (viewport) {
+      savedZoomTransform = viewport.style.transform;
+      savedZoomMargin = viewport.style.marginBottom;
+      viewport.style.transform = 'none';
+      viewport.style.marginBottom = '0';
+    }
+    document.body.classList.add('clean-capture-mode');
+  }
+
+  function exitCleanMode() {
+    document.body.classList.remove('clean-capture-mode');
+    if (viewport) {
+      viewport.style.transform = savedZoomTransform;
+      viewport.style.marginBottom = savedZoomMargin;
+    }
+  }
+
+  if (btnClean) {
+    btnClean.addEventListener('click', enterCleanMode);
+  }
+
+  // Keyboard only: Press Esc to exit clean mode
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('clean-capture-mode')) {
+      exitCleanMode();
+    }
   });
 }

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Edge AI Electronic Nose | Industrial Safety Gateway</title>
-  <meta name="description" content="Edge AI-Based Electronic Nose for Hydrogen Sulfide Leak Detection & Industrial Gas Monitoring. Powered by Advantech AIoT & Raspberry Pi 3.">
+  <meta name="description" content="Edge AI-Based Electronic Nose for Hydrogen Sulfide Leak Detection & Industrial Gas Monitoring. Powered by Advantech AIoT & Raspberry Pi 3 Edge Gateway.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -108,7 +108,7 @@
         Hệ Thống Mũi Điện Tử <span class="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-cyan-300 to-emerald-400">Edge AI</span>
       </h1>
       <p class="text-base sm:text-lg text-slate-300 leading-relaxed font-light">
-        Nhận diện rò rỉ khí Hydrogen Sulfide (<span class="font-mono text-amber-300 font-normal">H₂S</span>) & Ammonia (<span class="font-mono text-cyan-300 font-normal">NH₃</span>) siêu sớm tại biên với độ trễ <strong>3.8 ms</strong>, thuật toán <strong>RandomForest Dual-Mode</strong> đạt độ chính xác <strong>95.21%</strong>.
+        Nhận diện rò rỉ khí Hydrogen Sulfide (<span class="font-mono text-amber-300 font-normal">H₂S</span>) & Ammonia (<span class="font-mono text-cyan-300 font-normal">NH₃</span>) siêu sớm tại biên với độ trễ <strong>&lt; 100 ms</strong>, thuật toán <strong>RandomForest Dual-Mode</strong> đạt độ chính xác <strong>95.76%</strong> (94.97% Streaming).
       </p>
 
       <!-- LIVE TELEMETRY TICKER -->
@@ -220,15 +220,15 @@
 
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
         <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
-          <div class="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono">95.21%</div>
+          <div class="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono">95.76%</div>
           <div class="text-[11px] text-slate-400 mt-1 uppercase tracking-wider">Độ Chính Xác Phân Loại</div>
         </div>
         <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
-          <div class="text-2xl sm:text-3xl font-extrabold text-sky-400 font-mono">3.8 ms</div>
+          <div class="text-2xl sm:text-3xl font-extrabold text-sky-400 font-mono">&lt; 100 ms</div>
           <div class="text-[11px] text-slate-400 mt-1 uppercase tracking-wider">Độ Trễ Suy Luận Biên</div>
         </div>
         <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
-          <div class="text-2xl sm:text-3xl font-extrabold text-amber-400 font-mono">3.79 ppm</div>
+          <div class="text-2xl sm:text-3xl font-extrabold text-amber-400 font-mono">2.47 ppm</div>
           <div class="text-[11px] text-slate-400 mt-1 uppercase tracking-wider">Sai Số Nồng Độ (MAE)</div>
         </div>
         <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800/80">
